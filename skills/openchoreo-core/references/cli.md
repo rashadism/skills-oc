@@ -4,7 +4,7 @@ The `occ` CLI manages OpenChoreo resources. This file covers install, login, con
 
 For workflow-specific command details:
 - Application work — `openchoreo-developer/references/cli-developer.md`
-- Platform resource creation — `openchoreo-platform-engineer/references/cli-platform.md`
+- Platform engineering (ComponentTypes, Traits, Workflows, Authz) — see the `openchoreo-platform-engineer` skill's reference routing
 - Cluster install — `openchoreo-install/references/`
 
 ## Install
@@ -74,10 +74,15 @@ occ login --client-credentials --client-id <id> --client-secret <secret>
 
 ## Global Flags
 
+Common short flags across `occ` subcommands (v1.0.0-rc.2+):
+- `-n` — namespace
+- `-p` — project
+- `-c` — component
+
 Flag support is **not uniform** across `occ` subcommands:
 
-- Many `list` commands accept scope flags such as `--project`.
-- Many `get` commands use `--namespace` only and do not accept `--project`.
+- Many `list` commands accept scope flags such as `--project` / `-p`.
+- Many `get` commands use `--namespace` / `-n` only and do not accept `--project`.
 - Some workflow subcommands (e.g. `occ component workflow logs`) accept `--namespace` but not `--project`.
 
 Use `--help` on the exact subcommand when scope handling matters. Context defaults often carry project selection more reliably than flags.
@@ -192,13 +197,23 @@ occ workload list                    # what workloads exist?
 
 **`list` vs `get` scope**: `list` commands respect `--project`. `get` commands work with `--namespace` only — scoping for `get` flows through context defaults.
 
-**`scaffold --type` format**: Must be `workloadType/typeName`, not just the type name.
-- Wrong: `occ component scaffold --type service`
-- Right: `occ component scaffold --type deployment/service`
+**`scaffold` flag pairs are scope-specific**: The single `--type` flag was removed in v1.0.0-rc.2. Use the namespace-scoped flags (`--componenttype`, `--traits`, `--workflow`) **or** the cluster-scoped flags (`--clustercomponenttype`, `--clustertraits`, `--clusterworkflow`) — they are mutually exclusive. Cluster-scoped types are the platform default, so most scaffolds use the cluster flags.
 
-**`scaffold` component name is positional**: There is no `--name` flag.
-- Wrong: `occ component scaffold --name my-app --type deployment/service`
-- Right: `occ component scaffold my-app --type deployment/service`
+```bash
+# Cluster-scoped (most common — default platform setup)
+occ component scaffold my-app --clustercomponenttype deployment/service
+
+# With cluster-scoped traits and workflow
+occ component scaffold my-app --clustercomponenttype deployment/web-application \
+  --clustertraits storage,ingress --clusterworkflow dockerfile-builder
+
+# Namespace-scoped (when the org provides custom namespace-scoped types)
+occ component scaffold my-app --componenttype deployment/service
+```
+
+**Type format is `workloadType/typeName`**: e.g., `deployment/service`, not just `service`.
+
+**`scaffold` component name is positional**: There is no `--name` flag — the component name is the first positional argument.
 
 **`component get` has no `--project` flag**: Use `--namespace` and rely on context defaults for project scope.
 

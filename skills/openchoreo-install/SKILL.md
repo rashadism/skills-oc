@@ -1,7 +1,7 @@
 ---
 name: openchoreo-install
 description: |
-  Use this whenever the task is about installing or setting up OpenChoreo on a Kubernetes cluster: installing prerequisites, configuring planes (control, data, workflow, observability), troubleshooting installation failures, or tearing down an installation. Pairs with `openchoreo-platform-engineer` for post-install platform configuration.
+  Use this for the **initial install** of OpenChoreo on a Kubernetes cluster: installing prerequisites, registering planes (control, data, workflow, observability) for the first time, troubleshooting installation failures, or tearing down an installation. Do NOT use for post-install operations (Helm upgrades, day-2 plane changes, registering additional planes) — those belong to `openchoreo-platform-engineer` or the official PE guide.
 metadata:
   version: "1.0.0"
 ---
@@ -72,4 +72,4 @@ Read only what the task needs:
 - Running `helm upgrade --reuse-values` before the initial install has completed
 - Setting domains before the LoadBalancer IP is stable
 - Proceeding to data plane registration before `cluster-gateway-ca` certificate is Ready in `openchoreo-control-plane`
-- Using `occ login --client-credentials` with `service_mcp_client` — it doesn't work for the occ OIDC flow; use browser-based `occ login`
+- Using `occ login --client-credentials` with `service_mcp_client` — fails with `unauthorized_client`. Use browser-based `occ login` instead.

@@ -32,7 +32,7 @@ Across every OpenChoreo workflow:
 
 - **`occ <resource> get <name>` returns full YAML** (spec + status). No `-o` flag. Primary inspection and debugging tool.
 - **API version is `openchoreo.dev/v1alpha1`** for every OpenChoreo resource.
-- **`deploymentPipelineRef` is an object**, not a string: `{kind: DeploymentPipeline, name: <name>}` (changed in v1.0.0).
+- **`deploymentPipelineRef` is an object**, not a string. `kind` is optional and defaults to `DeploymentPipeline`, so `{name: <name>}` is the typical form (changed in v1.0.0). Same shape applies to `sourceEnvironmentRef` / `targetEnvironmentRefs[]` in `DeploymentPipeline` — both are objects with `name` (and optional `kind`).
 - **`occ login --client-credentials` does not work with `service_mcp_client`** (the MCP-token service account) — `unauthorized_client` error. Use browser-based `occ login`.
 - **Two separate MCP servers** — both must be configured; neither covers the other's surface.
 - **`status.conditions` is the source of truth.** Always check before guessing.

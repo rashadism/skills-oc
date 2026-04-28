@@ -11,7 +11,7 @@ Both must be configured separately; neither covers the other's surface.
 
 For workflow-specific MCP detail (deploy flows, third-party app workflows, plane registration, etc.) see:
 - Application work — `openchoreo-developer/references/mcp-developer.md`
-- Platform engineering — `openchoreo-platform-engineer/references/mcp-platform.md`
+- Platform engineering — see the `openchoreo-platform-engineer` skill's reference routing
 
 ## Control plane tool catalog
 
@@ -54,12 +54,15 @@ For workflow-specific MCP detail (deploy flows, third-party app workflows, plane
 | `list_deployment_pipelines` | `occ deploymentpipeline list` | List deployment pipelines |
 | `get_deployment_pipeline` | `occ deploymentpipeline get <name>` | Get deployment pipeline details |
 | `list_release_bindings` | `occ releasebinding list` | List release bindings |
-| `get_release_binding` | `occ releasebinding get <name>` | Get a specific release binding |
+| `get_release_binding` | `occ releasebinding get <name>` | Get a specific release binding (includes resolved component dependencies) |
+| `create_release_binding` | `occ apply -f releasebinding.yaml` | Deploy a component release to an environment |
 | `patch_release_binding` | `occ apply -f releasebinding.yaml` (update) | Patch a release binding (overrides, env, release) |
 | `update_release_binding_state` | — | Set release binding state: `Active` or `Undeploy` |
 | `list_secret_references` | `occ secretreference list` | List secret references |
 
-> **No MCP tools** for `create_environment`, `create_deployment_pipeline`, `deploy_release`, `promote_component`, or plane CRUD. Use `occ apply -f` for these — see the workflow-specific MCP references for the full pattern.
+> **No MCP tools** for `create_environment`, `create_deployment_pipeline`, or plane CRUD. Use `occ apply -f` for those. Deployment is now done via `create_release_binding` — there is no separate `deploy_release` or `promote_component` tool.
+
+> The platform-engineer toolset is enabled by default in v1.0.0-rc.2+; tools for ComponentTypes, Traits, ComponentReleases, DeploymentPipelines, and cluster plane resources are available without extra configuration.
 
 ## Observability tool catalog
 
@@ -72,6 +75,8 @@ For workflow-specific MCP detail (deploy flows, third-party app workflows, plane
 | `query_traces` | Search distributed traces for a component |
 | `query_trace_spans` | List spans within a trace |
 | `get_span_details` | Full detail for a single span |
+| `query_alerts` | Query fired alert events for a component / environment |
+| `query_incidents` | Query incidents created from alerts; includes update endpoint for triage |
 
 ## Universal Exploration Workflow
 

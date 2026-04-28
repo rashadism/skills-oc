@@ -42,6 +42,8 @@ In single-cluster setups, both planes run in the same cluster.
 
 > **Don't put `WorkflowRun` in GitOps repos.** It triggers an action rather than declaring desired state. Create runs through Git webhooks, the UI, or `occ apply`.
 
+> The `workflow` reference (`spec.workflow.kind` and `name`) is **immutable** on a `WorkflowRun` once created — you cannot change which workflow a run targets after it exists. Create a new run for a different workflow.
+
 ### `runTemplate` vs ClusterWorkflowTemplates
 
 A `ClusterWorkflowTemplate` defines **one step**. The Workflow CR's `runTemplate` is an inline Argo Workflow that **composes multiple CWTs into a pipeline** via per-step `templateRef`:

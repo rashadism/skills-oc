@@ -4,7 +4,7 @@ All resources use `apiVersion: openchoreo.dev/v1alpha1`.
 
 Prefer `occ component scaffold` or a matching sample from `samples/` before hand-writing YAML. Inspect the live cluster schema with the relevant MCP tool (`get_cluster_component_type_schema`, `get_workload_schema`, etc.) when unsure of a field shape.
 
-This file holds **universal** resource schemas — those that any OpenChoreo workflow needs. PE-only schemas (DataPlane, WorkflowPlane, ObservabilityPlane, NotificationChannel) live in `openchoreo-platform-engineer/references/cli-platform.md`.
+This file holds **universal** resource schemas — those any OpenChoreo workflow needs. Plane resource shapes (`DataPlane`, `WorkflowPlane`, `ObservabilityPlane`, `ObservabilityAlertsNotificationChannel`) are install-time concerns; consult the official PE guide at https://openchoreo.dev/docs/platform-engineer-guide/ for those.
 
 ## Project
 

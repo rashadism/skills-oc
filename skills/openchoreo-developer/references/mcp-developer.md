@@ -45,7 +45,7 @@ update_release_binding_state(namespace, binding_name, Undeploy)→ undeploy from
 patch_release_binding(namespace, binding_name, overrides)      → update env overrides or release ref
 ```
 
-> **No MCP tools** for `deploy_release` or `promote_component`. To promote to a downstream environment, `occ apply -f releasebinding.yaml` with the target environment, or patch the binding's `environment` field.
+> Deployment is via `create_release_binding` (added in v1.0.0-rc.2). There is no separate `deploy_release` or `promote_component` tool. To promote to a downstream environment, create a new ReleaseBinding for that environment via `create_release_binding` (or `occ apply -f releasebinding.yaml`), then call `update_release_binding_state` with `Active`.
 
 ### 4. Inspect and Debug
 

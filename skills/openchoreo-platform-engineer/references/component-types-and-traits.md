@@ -122,6 +122,8 @@ Each entry produces zero or more Kubernetes resources, generated from a CEL-temp
 
 `includeWhen` is evaluated **before** `forEach` and controls the entire block. The loop variable is **not** available in `includeWhen`. For per-item filtering, use `.filter()` inside the `forEach` expression — see `cel.md`.
 
+> **Admission rule (v1.0.0-rc.2+)**: resource templates **must not** hardcode `metadata.namespace`. Use `${metadata.namespace}` (the platform-resolved target namespace) instead. The webhook rejects literal namespace strings in `resources[].template.metadata.namespace`.
+
 ### Complete ComponentType example
 
 ```yaml

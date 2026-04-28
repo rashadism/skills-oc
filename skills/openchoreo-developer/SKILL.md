@@ -99,7 +99,7 @@ Use `occ component scaffold` for Components whenever possible. For existing reso
 
 If a field path matters, confirm it in the live resource, schema reference, or current docs before patching. This avoids stale assumptions around workflow config, overrides, and app-to-platform boundaries.
 
-Use `occ component scaffold <name> --type <workloadType/typeName>` to generate a valid starting YAML. Pipe with `-o <file>` to save it.
+Use `occ component scaffold <name> --clustercomponenttype <workloadType/typeName>` (or `--componenttype` for namespace-scoped types) to generate a valid starting YAML. Pipe with `-o <file>` to save it.
 
 ### 5. Verify with live app evidence
 

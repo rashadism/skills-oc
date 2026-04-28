@@ -60,7 +60,7 @@ spec:
   endpoints:
     http:
       port: 8080
-      type: REST
+      type: HTTP                  # HTTP | GraphQL | Websocket | gRPC | TCP | UDP
       visibility: ["external"]
 ```
 
@@ -105,14 +105,13 @@ spec:
   owner:
     projectName: default
   componentType:
+    kind: ClusterComponentType
     name: deployment/service
   autoDeploy: true
   workflow:
-    name: docker
+    kind: ClusterWorkflow
+    name: dockerfile-builder
     parameters:
-      scope:
-        projectName: "default"
-        componentName: "my-app"
       repository:
         url: "https://github.com/myorg/my-app"
         revision:
@@ -128,7 +127,7 @@ Follow build logs: `occ component workflow logs my-app -f`
 
 **Important path rule for multi-directory repos**: `repository.appPath` tells the workflow where the service source lives and where to find `workload.yaml`, but Docker workflow paths still need to match the actual repo layout. If the service lives under `backend/` with `backend/Dockerfile`, use `docker.context: ./backend` and `docker.filePath: ./backend/Dockerfile` or the equivalent leading-slash form used by repo samples. Do not assume `appPath: ./backend` makes `./Dockerfile` resolve inside that directory.
 
-**Important project rule for source builds**: Keep `spec.owner.projectName`, `spec.workflow.parameters.scope.projectName`, and the active `occ` context project aligned. If the workflow scope still points at `default`, the build can generate a Workload owned by the wrong project even when the Component itself lives in the right project.
+**Important project rule for source builds**: The Component's `spec.owner.projectName` and the active `occ` context project must agree. The workflow's parameter shape comes from the workflow's own schema — inspect with `occ clusterworkflow get <name>` to confirm what the build pipeline accepts.
 
 ## How the CI Pipeline Works
 
@@ -210,7 +209,7 @@ metadata:
 endpoints:
   - name: api                   # unique endpoint name
     port: 8080                  # exposed port (required)
-    type: REST                  # HTTP, REST, gRPC, GraphQL, Websocket, TCP, UDP
+    type: HTTP                  # HTTP | GraphQL | Websocket | gRPC | TCP | UDP
     targetPort: 8080            # container port (defaults to port)
     displayName: "REST API"     # human-readable name
     basePath: "/api/v1"         # URL path prefix
@@ -276,8 +275,8 @@ occ clustertrait list
 occ trait list
 
 # Generate YAML (--type format is workloadType/typeName)
-occ component scaffold my-app --type deployment/service -o my-app.yaml
-occ component scaffold my-app --type deployment/web-application \
+occ component scaffold my-app --clustercomponenttype deployment/service -o my-app.yaml
+occ component scaffold my-app --clustercomponenttype deployment/web-application \
   --traits persistent-volume,ingress --workflow react -o my-app.yaml
 ```
 
@@ -801,7 +800,7 @@ For apps with many services, batch workloads into YAML files and apply with `occ
    - Environments/pipeline: `occ environment list`, `occ deploymentpipeline list`
    - Component types: `occ clustercomponenttype list`, `occ componenttype list`
    - Workflows for source builds: `occ workflow list`
-6. **Scaffold**: `occ component scaffold my-app --type deployment/service -o my-app.yaml`
+6. **Scaffold**: `occ component scaffold my-app --clustercomponenttype deployment/service -o my-app.yaml`
 7. **Align project references**: set the target project in context, `spec.owner.projectName`, and `spec.workflow.parameters.scope.projectName`
 8. **Configure source builds**: If building from source, add `spec.workflow` to the Component and add `workload.yaml` at the `appPath` root
 9. **Adapt the app**: Replace hardcoded URLs and secrets with env vars plus local defaults

@@ -10,11 +10,11 @@ Generates Component YAML from available ComponentTypes and Traits. Always prefer
 
 ```bash
 # --type format is workloadType/typeName (e.g., deployment/service)
-occ component scaffold my-app --type deployment/service
-occ component scaffold my-app --type deployment/web-application --traits storage,ingress
-occ component scaffold my-app --type deployment/web-application --workflow react
-occ component scaffold my-app --type deployment/web-application -o my-app.yaml
-occ component scaffold my-app --type deployment/web-application --skip-comments --skip-optional
+occ component scaffold my-app --clustercomponenttype deployment/service
+occ component scaffold my-app --clustercomponenttype deployment/web-application --clustertraits storage,ingress
+occ component scaffold my-app --clustercomponenttype deployment/web-application --clusterworkflow react
+occ component scaffold my-app --clustercomponenttype deployment/web-application -o my-app.yaml
+occ component scaffold my-app --clustercomponenttype deployment/web-application --skip-comments --skip-optional
 ```
 
 ### `component deploy`
