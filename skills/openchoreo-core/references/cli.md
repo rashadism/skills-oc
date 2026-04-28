@@ -1,11 +1,8 @@
-# `occ` CLI — Foundational Reference
+# `occ` CLI
 
-The `occ` CLI manages OpenChoreo resources. This file covers install, login, context, the command surface, and gotchas that apply to every workflow.
+Single source of truth for the `occ` CLI: install, login, the full command surface, workflow commands (scaffold, deploy, build, logs), and every gotcha. Used by `openchoreo-developer`, `openchoreo-install`, and `openchoreo-platform-engineer` as their CLI reference — no per-skill duplicates.
 
-For workflow-specific command details:
-- Application work — `openchoreo-developer/references/cli-developer.md`
-- Platform engineering (ComponentTypes, Traits, Workflows, Authz) — see the `openchoreo-platform-engineer` skill's reference routing
-- Cluster install — `openchoreo-install/references/`
+For platform-resource creation patterns specifically (Environment, DeploymentPipeline, Project YAML applied via `occ apply -f`), the YAML shapes live in `resource-schemas.md` and detailed authoring sits in the workflow skills (`openchoreo-platform-engineer/references/component-types-and-traits.md`, `workflows.md`, `authz.md`).
 
 ## Install
 
@@ -168,6 +165,74 @@ occ <resource> list                  # summary list
 occ <resource> list --project <p>    # most list commands accept --project
 ```
 
+## Component Lifecycle Commands
+
+### `component scaffold`
+
+Generates Component YAML from available ComponentTypes and Traits. Always prefer this over writing YAML from scratch.
+
+```bash
+# Cluster-scoped (most common — default platform setup)
+occ component scaffold my-app --clustercomponenttype deployment/service
+
+# With cluster-scoped traits and workflow
+occ component scaffold my-app --clustercomponenttype deployment/web-application \
+  --clustertraits storage,ingress --clusterworkflow dockerfile-builder
+
+# Output to file
+occ component scaffold my-app --clustercomponenttype deployment/web-application -o my-app.yaml
+
+# Minimal output for templating
+occ component scaffold my-app --clustercomponenttype deployment/web-application --skip-comments --skip-optional
+
+# Namespace-scoped (when the org provides custom namespace-scoped types)
+occ component scaffold my-app --componenttype deployment/service
+```
+
+### `component deploy`
+
+```bash
+occ component deploy my-app                                       # deploy latest release to root env
+occ component deploy my-app --to staging                          # promote to staging
+occ component deploy my-app --release my-app-20260126-143022-1    # deploy specific release
+occ component deploy my-app --set spec.componentTypeEnvironmentConfigs.replicas=3
+```
+
+### `component logs`
+
+```bash
+occ component logs my-app                    # logs from lowest environment
+occ component logs my-app --env production   # specific environment
+occ component logs my-app --env dev -f       # follow logs
+occ component logs my-app --since 30m        # last 30 minutes
+occ component logs my-app --tail 100         # last 100 lines
+```
+
+### `component workflow` / `workflowrun`
+
+```bash
+occ component workflow run my-app             # trigger build
+occ component workflow logs my-app -f         # follow build logs
+occ component workflowrun list my-app         # list builds
+occ workflow run migration --set spec.workflow.parameters.key=value
+```
+
+### `workload create`
+
+```bash
+occ workload create --name my-wl --component my-app --image nginx:latest
+occ workload create --name my-wl --component my-app --descriptor workload.yaml
+occ workload create --name my-wl --component my-app --descriptor workload.yaml --dry-run
+```
+
+### `componentrelease` / `releasebinding` (file-system mode only)
+
+```bash
+occ componentrelease generate --all
+occ componentrelease generate --project my-proj --component my-comp
+occ releasebinding generate --target-env development --use-pipeline default --all
+```
+
 ## Exploration Workflow
 
 When working with an unfamiliar OpenChoreo cluster, explore in this order:
@@ -191,7 +256,7 @@ occ component list --project my-proj # what components are deployed?
 occ workload list                    # what workloads exist?
 ```
 
-## Universal Gotchas
+## Gotchas
 
 **No `--output` / `-o` flag**: Unlike kubectl, `occ get` always returns YAML. There is no JSON or table output option.
 
@@ -199,26 +264,31 @@ occ workload list                    # what workloads exist?
 
 **`scaffold` flag pairs are scope-specific**: The single `--type` flag was removed in v1.0.0-rc.2. Use the namespace-scoped flags (`--componenttype`, `--traits`, `--workflow`) **or** the cluster-scoped flags (`--clustercomponenttype`, `--clustertraits`, `--clusterworkflow`) — they are mutually exclusive. Cluster-scoped types are the platform default, so most scaffolds use the cluster flags.
 
-```bash
-# Cluster-scoped (most common — default platform setup)
-occ component scaffold my-app --clustercomponenttype deployment/service
-
-# With cluster-scoped traits and workflow
-occ component scaffold my-app --clustercomponenttype deployment/web-application \
-  --clustertraits storage,ingress --clusterworkflow dockerfile-builder
-
-# Namespace-scoped (when the org provides custom namespace-scoped types)
-occ component scaffold my-app --componenttype deployment/service
-```
-
 **Type format is `workloadType/typeName`**: e.g., `deployment/service`, not just `service`.
 
 **`scaffold` component name is positional**: There is no `--name` flag — the component name is the first positional argument.
 
 **`component get` has no `--project` flag**: Use `--namespace` and rely on context defaults for project scope.
 
-**`deploymentPipelineRef` is now an object**: In Project YAML, use `{kind: DeploymentPipeline, name: default}`, not the plain string form (changed in v1.0.0).
+**`deploymentPipelineRef` is now an object**: In Project YAML, use `{kind: DeploymentPipeline, name: default}`, not the plain string form (changed in v1.0.0). `kind` is optional and defaults to `DeploymentPipeline`.
 
 **`occ apply -f -` (stdin) does not work** — see the `apply` section above. Pipe-into-occ patterns must be replaced with temp-file patterns.
 
 **`service_mcp_client` cannot be used for `occ login --client-credentials`** — see Setup Flow above.
+
+**Docker workflow paths are repo-relative**: `repository.appPath` selects the source subdirectory and `workload.yaml`, but `docker.context` and `docker.filePath` must still point at real repo-root-relative paths. If `appPath` is `./backend`, a Dockerfile under `backend/` should use `docker.context: ./backend` and `docker.filePath: ./backend/Dockerfile`.
+
+**`workflowrun list` can lag**: A just-finished build may still appear `Pending` briefly. Confirm completion with `occ component workflow logs`, `occ component get`, and `occ releasebinding get`.
+
+**`workflow` subcommands are inconsistent about `--project`**:
+- `occ component workflow run` accepts `--project`
+- `occ component workflow logs` does not
+- After changing projects, update or switch context before using `workflow logs`, `component get`, or similar follow-up commands.
+
+**`releasebinding list` requires both `--project` and `--component`**:
+- Wrong: `occ releasebinding list --project my-proj`
+- Right: `occ releasebinding list --project my-proj --component my-app`
+
+**Workload owners are not patch-friendly**: If a generated Workload has the wrong `spec.owner`, plan to regenerate or recreate it after fixing the Component/workflow project config rather than editing the owner in place.
+
+**DeploymentPipeline applied with `occ apply` works in v1.0.0+**: Earlier versions had a client/server schema disagreement on `sourceEnvironmentRef`. As of v1.0.0 the `occ apply` registry handles `DeploymentPipeline` correctly — provided the YAML uses the canonical object form (`{name: <env>}`), which has always been the API server's expected shape.

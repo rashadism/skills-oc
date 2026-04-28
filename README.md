@@ -65,9 +65,9 @@ For application-level work: deploying apps, debugging Components and Workloads, 
 
 | File | Contents |
 |------|----------|
-| `deployment-guide.md` | BYOI, source builds, `workload.yaml`, dependencies, promotion, third-party apps |
-| `cli-developer.md` | Developer-specific `occ` commands (scaffold, deploy, logs, workflow, workload create) and gotchas |
-| `mcp-developer.md` | Developer-specific MCP workflows (scaffold, build, deploy, inspect, multi-service apps) and gotchas |
+| `deployment-guide.md` | BYOI, source builds, `workload.yaml`, dependencies, promotion, env vars / config / secrets, third-party apps walkthrough |
+
+CLI commands and MCP workflows for developer tasks live in `openchoreo-core/` — see the table above.
 
 ---
 
@@ -190,9 +190,7 @@ openchoreo-install/
 openchoreo-developer/
   SKILL.md                  # Developer skill guide — loaded by AI agent
   references/
-    deployment-guide.md     # BYOI, source builds, workload.yaml, dependencies, promotion
-    cli-developer.md        # Developer-specific occ commands and gotchas
-    mcp-developer.md        # Developer-specific MCP workflows and gotchas
+    deployment-guide.md     # BYOI, source builds, workload.yaml, dependencies, promotion, third-party apps
 
 openchoreo-platform-engineer/
   SKILL.md                  # Platform engineer skill guide — loaded by AI agent

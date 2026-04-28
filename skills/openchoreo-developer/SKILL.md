@@ -47,13 +47,11 @@ Before inventing YAML, prefer live scaffolding and repository samples.
 
 ## Reference routing
 
-Foundational material lives in `openchoreo-core/references/` (concepts, CLI install/login, MCP tool catalog, universal YAML schemas). Read those first when the gap is foundational.
+CLI commands, MCP tool catalogs, and workflow patterns (scaffold, build, deploy, debug, multi-service third-party app deployment) all live in `openchoreo-core/` — there are no per-skill CLI/MCP duplicates. Read `openchoreo-core/references/cli.md` and `openchoreo-core/references/mcp.md` for those.
 
 Developer-specific material:
 
-- `references/deployment-guide.md` for BYOI, source builds, `workload.yaml`, dependencies, overrides, deployment flow, and **deploying third-party/public apps with pre-built images**
-- `references/cli-developer.md` for developer-specific `occ` commands (scaffold, deploy, logs, workflow run/logs, workload create, componentrelease/releasebinding generate) and gotchas
-- `references/mcp-developer.md` for developer-specific MCP workflows (scaffold, build, deploy, inspect, multi-service third-party apps) and gotchas
+- `references/deployment-guide.md` for BYOI, source builds, `workload.yaml`, dependencies, overrides, deployment flow, env-var patterns, and the long-form third-party-app deployment walkthrough
 
 When the task crosses into PE-managed capabilities, activate `openchoreo-platform-engineer`.
 
