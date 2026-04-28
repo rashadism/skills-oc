@@ -14,17 +14,22 @@ Help with OpenChoreo platform-level work. Keep this file generic and pull specif
 
 ## Scope and pairing
 
-Use this skill for PE-owned work:
+Use this skill for PE-owned work. The PE responsibility surface, aligned with https://openchoreo.dev/docs/platform-engineer-guide/:
 
-- Cluster-side setup, upgrades, and troubleshooting
-- Helm, CRD, controller, or agent investigation
-- Platform resources such as DataPlane, WorkflowPlane, ObservabilityPlane, Environment, DeploymentPipeline, Project, ComponentType, Trait, Workflow, and ClusterWorkflow
-- Shared platform capabilities such as gateways, secret stores, registries, identity, RBAC, and observability
+- **Platform topology and lifecycle** — cluster setup, plane registration (DataPlane, WorkflowPlane, ObservabilityPlane), multi-cluster connectivity, namespace management, deployment topology, Helm upgrades, upgrade ordering between planes.
+- **Authoring extensions** — ComponentTypes / ClusterComponentTypes, Traits / ClusterTraits, Workflows / ClusterWorkflows (schema, templates, patches, CEL).
+- **Environments and pipelines** — `Environment`, `DeploymentPipeline`, and project-level configuration that goes beyond ordinary developer use.
+- **Integrations and security** — secret stores, container registries, identity providers (Thunder / external IdP), authorization roles and bindings, external CA / TLS, cluster-agent RBAC.
+- **API gateway** — gateway topology, Choreo modules, API management.
+- **CI/CD governance** — workflow authoring, auto-build configuration, external CI integration, CI governance.
+- **Observability** — alerting rules, notification channels, logging / metrics / tracing adapter modules.
+- **GitOps** — repository layout, Flux CD setup, build-and-release automations, bulk promotion.
+- **Troubleshooting platform failures** — failure isolation across planes, controller / gateway / agent logs.
 
-Activate `openchoreo-developer` at the same time when the task also includes any of these:
+Activate `openchoreo-developer` at the same time when the task also touches:
 
 - Deploying or debugging an application
-- Editing app-facing Component, Workload, ReleaseBinding, or `workload.yaml`
+- Editing app-facing `Component`, `Workload`, `ReleaseBinding`, or `workload.yaml`
 - Using `occ` to inspect or operate a developer workload
 
 If both skills are available and the task touches both app behavior and platform behavior, use both immediately. Do not wait to fail on one side before loading the other.
@@ -49,19 +54,14 @@ Avoid loading all references up front. Pull them in only when the task requires 
 
 Foundational material lives in `openchoreo-core/references/` (concepts, CLI install/login, MCP tool catalog, universal YAML schemas). Read those first when the gap is foundational.
 
-PE-specific material:
+PE-specific material in this skill:
 
-- `references/operations.md` for namespace provisioning, topology, multi-cluster connectivity, and upgrades
-- `references/templates-and-workflows.md` for ComponentTypes, Traits, Workflows, CEL, and template rules
-- `references/integrations.md` for secret stores, registries, identity, RBAC, webhooks, and API management
-- `references/observability.md` for logs, metrics, traces, alerts, and notification channels
+- `references/templates-and-workflows.md` for ComponentType, Trait, Workflow, and CEL authoring
 - `references/troubleshooting.md` for failure isolation, health checks, log locations, and common failure patterns
-- `references/cli-platform.md` for PE-specific `occ` commands, platform resource creation patterns (Environment, DeploymentPipeline, Project), and plane YAML schemas (DataPlane, WorkflowPlane, ObservabilityPlane, NotificationChannel)
-- `references/mcp-platform.md` for PE-specific MCP workflows (initial setup, register types/traits/workflows, validate observability) and PE-specific gotchas
-- `references/gitops.md` for GitOps repository layout and release flow
-- `references/community-modules.md` for pluggable gateways and observability backends
-- `references/advanced-setup.md` for certificates, private Git, custom build flows, and identity-provider swaps
-- `references/repo-and-context7.md` when the docs are not enough and you need controller logic, CRD definitions, or Helm chart details
+- `references/cli-platform.md` for PE-specific `occ` commands, platform resource creation (Environment, DeploymentPipeline, Project), and plane YAML schemas (DataPlane, WorkflowPlane, ObservabilityPlane, NotificationChannel)
+- `references/mcp-platform.md` for PE-specific MCP workflows (initial setup, registering types/traits/workflows, validating observability) and PE-specific gotchas
+
+For PE topics not bundled in these references — TLS / external CA, container registries, identity providers, namespace management, multi-cluster connectivity, deployment topology, GitOps automations, observability adapter modules, API gateway modules, alerting, authorization roles, Backstage configuration, upgrades — consult the official PE guide at **https://openchoreo.dev/docs/platform-engineer-guide/**. The docs are the source of truth for those topics; do not rely on memory.
 
 ## Discovery-first workflow
 

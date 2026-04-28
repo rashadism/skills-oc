@@ -44,7 +44,7 @@ Publish step (pushes image to registry):
 kubectl apply -f https://raw.githubusercontent.com/openchoreo/openchoreo/main/samples/getting-started/workflow-templates/publish-image.yaml
 ```
 
-> **Default image registry:** The publish template uses [ttl.sh](https://ttl.sh) — a free ephemeral registry. Images expire after **24 hours**. For production, replace with a real registry (ECR, GCR, Docker Hub). See the platform engineer skill → `references/integrations.md` for registry configuration.
+> **Default image registry:** The publish template uses [ttl.sh](https://ttl.sh) — a free ephemeral registry. Images expire after **24 hours**. For production, replace with a real registry (ECR, GCR, Docker Hub) and configure registry credentials on the workflow plane.
 
 ## Step 4 — Register ClusterWorkflowPlane
 

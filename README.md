@@ -42,6 +42,21 @@ Claude Code handles the rest — ~6 minutes to a fully running cluster.
 
 ## Skills in this repository
 
+### `openchoreo-core`
+
+Foundational reference shared by every other OpenChoreo skill: resource concepts, `occ` CLI install/login, MCP tool catalog, and resource YAML schemas. Activated as a prerequisite by the workflow skills, and directly when the task is a definitional or lookup question.
+
+**References included:**
+
+| File | Contents |
+|------|----------|
+| `concepts.md` | Resource hierarchy, abstractions, cell architecture, planes |
+| `cli.md` | `occ` install, login, context, command surface, universal gotchas |
+| `mcp.md` | Control-plane and observability MCP tool catalog, exploration workflow |
+| `resource-schemas.md` | YAML shapes for Project, Component, Workload, Workload Descriptor, Environment, DeploymentPipeline, ReleaseBinding, SecretReference |
+
+---
+
 ### `openchoreo-developer`
 
 For application-level work: deploying apps, debugging Components and Workloads, writing app-facing YAML, and operating through `occ` or the MCP server.
@@ -50,34 +65,26 @@ For application-level work: deploying apps, debugging Components and Workloads, 
 
 | File | Contents |
 |------|----------|
-| `concepts.md` | Resource hierarchy, abstractions, cell architecture |
-| `cli-reference.md` | `occ` install, setup, all commands, gotchas |
-| `deployment-guide.md` | BYOI, source builds, `workload.yaml`, connections, promotion |
-| `resource-schemas.md` | Exact YAML shapes for all developer-facing resources |
-| `mcp-reference.md` | MCP tool quick reference, developer workflow → MCP tool mapping |
-| `platform-engineer.md` | PE-managed capabilities and escalation wording |
+| `deployment-guide.md` | BYOI, source builds, `workload.yaml`, dependencies, promotion, third-party apps |
+| `cli-developer.md` | Developer-specific `occ` commands (scaffold, deploy, logs, workflow, workload create) and gotchas |
+| `mcp-developer.md` | Developer-specific MCP workflows (scaffold, build, deploy, inspect, multi-service apps) and gotchas |
 
 ---
 
 ### `openchoreo-platform-engineer`
 
-For platform-level work: cluster setup, Helm, kubectl, planes, ComponentTypes, Traits, Workflows, gateways, secret stores, GitOps, and observability.
+For platform-level work: cluster setup, Helm, kubectl, planes, ComponentTypes, Traits, Workflows, gateways, secret stores, and observability.
 
 **References included:**
 
 | File | Contents |
 |------|----------|
-| `operations.md` | Namespace provisioning, topology, upgrades |
 | `templates-and-workflows.md` | ComponentType, Trait, Workflow, CEL authoring |
-| `integrations.md` | Secret stores, registries, identity, RBAC, webhooks |
-| `observability.md` | Logs, metrics, traces, alerts, notification channels |
 | `troubleshooting.md` | Failure isolation, health checks, common patterns |
-| `cli-and-resources.md` | PE-relevant `occ` commands and platform resource schemas |
-| `mcp-reference.md` | MCP tool quick reference, platform setup → MCP tool mapping |
-| `gitops.md` | GitOps repository layout and release flow |
-| `community-modules.md` | Pluggable gateways and observability backends |
-| `advanced-setup.md` | Certificates, private Git, custom builds, identity-provider swaps |
-| `repo-and-context7.md` | Controller logic, CRD definitions, Helm chart details |
+| `cli-platform.md` | PE-specific `occ` commands, platform resource creation (Environment, DeploymentPipeline, Project), plane YAML schemas |
+| `mcp-platform.md` | PE-specific MCP workflows (initial setup, registering types/traits/workflows, observability validation) |
+
+For everything else (TLS, registries, identity providers, multi-cluster, GitOps, alerting, modules, upgrades), the skill points at the official [PE guide](https://openchoreo.dev/docs/platform-engineer-guide/).
 
 ---
 
@@ -159,6 +166,14 @@ Each sample includes the exact prompt used, a step-by-step account of what the A
 ## Repository structure
 
 ```
+openchoreo-core/
+  SKILL.md                  # Foundational reference — prerequisite for the other skills
+  references/
+    concepts.md             # Resource model, cell architecture, planes
+    cli.md                  # occ install, login, command surface, universal gotchas
+    mcp.md                  # MCP tool catalog (control plane + observability)
+    resource-schemas.md     # Universal YAML shapes
+
 openchoreo-install/
   SKILL.md                  # Install skill guide — loaded by AI agent
   references/
@@ -174,27 +189,17 @@ openchoreo-install/
 openchoreo-developer/
   SKILL.md                  # Developer skill guide — loaded by AI agent
   references/
-    concepts.md
-    cli-reference.md
-    deployment-guide.md
-    resource-schemas.md
-    mcp-reference.md        # MCP tool guide for developers
-    platform-engineer.md
+    deployment-guide.md     # BYOI, source builds, workload.yaml, dependencies, promotion
+    cli-developer.md        # Developer-specific occ commands and gotchas
+    mcp-developer.md        # Developer-specific MCP workflows and gotchas
 
 openchoreo-platform-engineer/
   SKILL.md                  # Platform engineer skill guide — loaded by AI agent
   references/
-    operations.md
-    templates-and-workflows.md
-    integrations.md
-    observability.md
-    troubleshooting.md
-    cli-and-resources.md
-    mcp-reference.md        # MCP tool guide for platform engineers
-    gitops.md
-    community-modules.md
-    advanced-setup.md
-    repo-and-context7.md
+    templates-and-workflows.md  # ComponentType, Trait, Workflow, CEL authoring
+    troubleshooting.md          # Failure isolation, health checks, common patterns
+    cli-platform.md             # PE-specific occ commands and platform resource schemas
+    mcp-platform.md             # PE-specific MCP workflows
 
 samples/
   install-openchoreo-on-local-colima/
