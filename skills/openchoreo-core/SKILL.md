@@ -2,7 +2,7 @@
 name: openchoreo-core
 description: Core OpenChoreo reference — resource concepts, `occ` CLI install and usage, MCP tool catalog, and resource YAML schemas. Use to look up "what is X in OpenChoreo", how to install or log in to `occ`, which MCP tool covers Y, or the shape of a resource YAML. Prerequisite for `openchoreo-developer`, `openchoreo-install`, and `openchoreo-platform-engineer`.
 metadata:
-  version: 1.0.0
+  version: "1.0.0"
 ---
 
 # OpenChoreo Core

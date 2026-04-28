@@ -132,9 +132,28 @@ Look at `status.conditions` in the output. Each condition has `type`, `status`, 
 
 ```bash
 occ apply -f <file.yaml>    # Create/update resources from YAML
+occ apply -f <directory>    # Apply every .yaml/.yml file in the directory
+occ apply -f https://...    # Apply from a URL
 ```
 
-> **Gotcha**: `occ apply -f -` (stdin) does not work — error: `path - does not exist`. Write YAML to a temp file first, then apply.
+> **Gotcha — stdin doesn't work.** `occ apply -f -` fails with `path - does not exist`. Unlike kubectl, `occ` does not accept piped YAML. Always write YAML to a temp file first:
+>
+> ```bash
+> # Wrong — fails with: path - does not exist
+> cat <<EOF | occ apply -f -
+> apiVersion: openchoreo.dev/v1alpha1
+> kind: Environment
+> ...
+> EOF
+>
+> # Right — write to temp file, then apply
+> cat > /tmp/env.yaml <<'EOF'
+> apiVersion: openchoreo.dev/v1alpha1
+> kind: Environment
+> ...
+> EOF
+> occ apply -f /tmp/env.yaml
+> ```
 
 ### get / list
 
@@ -184,5 +203,7 @@ occ workload list                    # what workloads exist?
 **`component get` has no `--project` flag**: Use `--namespace` and rely on context defaults for project scope.
 
 **`deploymentPipelineRef` is now an object**: In Project YAML, use `{kind: DeploymentPipeline, name: default}`, not the plain string form (changed in v1.0.0).
+
+**`occ apply -f -` (stdin) does not work** — see the `apply` section above. Pipe-into-occ patterns must be replaced with temp-file patterns.
 
 **`service_mcp_client` cannot be used for `occ login --client-credentials`** — see Setup Flow above.

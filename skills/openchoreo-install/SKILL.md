@@ -3,7 +3,7 @@ name: openchoreo-install
 description: |
   Use this whenever the task is about installing or setting up OpenChoreo on a Kubernetes cluster: installing prerequisites, configuring planes (control, data, workflow, observability), troubleshooting installation failures, or tearing down an installation. Pairs with `openchoreo-platform-engineer` for post-install platform configuration.
 metadata:
-  version: 1.0.0
+  version: "1.0.0"
 ---
 
 # OpenChoreo Install Guide

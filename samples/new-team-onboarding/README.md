@@ -270,10 +270,12 @@ metadata:
     openchoreo.dev/description: "development → integration → production"
 spec:
   promotionPaths:
-    - sourceEnvironmentRef: development
+    - sourceEnvironmentRef:
+        name: development
       targetEnvironmentRefs:
         - name: integration
-    - sourceEnvironmentRef: integration
+    - sourceEnvironmentRef:
+        name: integration
       targetEnvironmentRefs:
         - name: production
 ```
@@ -291,13 +293,16 @@ metadata:
     openchoreo.dev/description: "development → staging → uat → production"
 spec:
   promotionPaths:
-    - sourceEnvironmentRef: development
+    - sourceEnvironmentRef:
+        name: development
       targetEnvironmentRefs:
         - name: staging
-    - sourceEnvironmentRef: staging
+    - sourceEnvironmentRef:
+        name: staging
       targetEnvironmentRefs:
         - name: uat
-    - sourceEnvironmentRef: uat
+    - sourceEnvironmentRef:
+        name: uat
       targetEnvironmentRefs:
         - name: production
 ```

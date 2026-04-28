@@ -129,7 +129,7 @@ query_component_logs(namespace, project, component, environment)
 - Always extract ALL env vars from official manifests — dependencies inject service addresses but not `PORT`, feature flags, or vendor SDK disable flags.
 - If a service crash-loops before logging a "listening" message, look for a native module load error or vendor SDK init failure — apply the disable flag from the official manifests.
 - If a required env var references an optional or not-yet-deployed service, set a placeholder value to prevent startup panics.
-- `dependencies` must be a **list**, not a map — each entry needs a `name` field.
+- `dependencies` is an **object containing an `endpoints` array** — entries live under `dependencies.endpoints[]`, with `name` for the target endpoint (not `endpoint`).
 - Source builds fail for repos that use `ARG BUILDPLATFORM` multi-stage syntax (exit code 125) — switch to BYO immediately when you see this error.
 
 ## Developer Gotchas

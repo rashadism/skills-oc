@@ -38,22 +38,20 @@ spec:
     projectName: my-project
   autoDeploy: true
   componentType:
-    kind: ComponentType
+    kind: ClusterComponentType        # or ComponentType for namespace-scoped
     name: deployment/service
   parameters: {}
   traits:
     - name: persistent-volume
-      kind: Trait
+      kind: ClusterTrait              # or Trait for namespace-scoped
       instanceName: storage
       parameters:
         volumeName: data
         mountPath: /var/data
   workflow:
-    name: docker
+    kind: ClusterWorkflow             # or Workflow for namespace-scoped
+    name: dockerfile-builder
     parameters:
-      scope:
-        projectName: "my-project"
-        componentName: "my-app"
       repository:
         url: "https://github.com/org/repo"
         revision:
@@ -66,10 +64,10 @@ spec:
 
 **Notes**:
 - Source builds use `spec.workflow`, not `spec.build`.
-- Workflow names and parameter shapes come from the cluster. Use `occ workflow list` and `occ workflow get <name>`, or a matching sample from `samples/from-source/`.
+- The `workflow.parameters` shape is determined by the workflow's `openAPIV3Schema`. The example above is for `dockerfile-builder`; other workflows have different shapes. Always inspect with `occ clusterworkflow get <name>` (or `occ workflow get <name>`) before authoring.
 - `componentType.name` is always `{workloadType}/{typeName}`.
+- `componentType.kind` and `workflow.kind` default to the cluster-scoped variant (`ClusterComponentType`, `ClusterWorkflow`). Set explicitly when using namespace-scoped types/workflows.
 - `repository.appPath` selects the service subdirectory and `workload.yaml`. `docker.context` and `docker.filePath` must still point at real repo-root-relative Docker build paths.
-- Keep `spec.owner.projectName` and `spec.workflow.parameters.scope.projectName` aligned to the same target project before the first build. A mismatch can create Workloads under the wrong project owner.
 - For BYO image deployments, **omit `spec.workflow`** entirely.
 
 ## Workload
@@ -109,7 +107,7 @@ spec:
             key: cert
   endpoints:
     api:
-      type: REST
+      type: HTTP                      # HTTP | GraphQL | Websocket | gRPC | TCP | UDP
       port: 8080
       targetPort: 8080
       visibility: ["external"]
@@ -125,18 +123,21 @@ spec:
       type: HTTP
       port: 9090
   dependencies:
-    - component: backend-api
-      endpoint: api
-      visibility: project
-      project: other-project
-      envBindings:
-        address: BACKEND_URL
-        host: BACKEND_HOST
-        port: BACKEND_PORT
-        basePath: BACKEND_PATH
+    endpoints:
+      - project: other-project        # optional; defaults to same project
+        component: backend-api
+        name: api                     # name of the target endpoint
+        visibility: project            # project | namespace
+        envBindings:
+          address: BACKEND_URL
+          host: BACKEND_HOST
+          port: BACKEND_PORT
+          basePath: BACKEND_PATH
 ```
 
-Every endpoint implicitly has `project` visibility. The `visibility` array adds `namespace`, `internal`, or `external`.
+`endpoints` is a **map** keyed by endpoint name (`api`, `metrics`, …). Allowed `type` values: `HTTP`, `GraphQL`, `Websocket`, `gRPC`, `TCP`, `UDP`. Every endpoint implicitly has `project` visibility — the `visibility` array adds `namespace`, `internal`, or `external`.
+
+`dependencies.endpoints` is a **list** of connections to other components' endpoints. Field names: `component`, `name` (target endpoint name), `visibility`, `envBindings`. Optional `project` defaults to the same project.
 
 For reverse proxies, prefer `host` and `port` bindings unless you explicitly want the endpoint `basePath` included in the upstream URL.
 
@@ -150,10 +151,10 @@ apiVersion: openchoreo.dev/v1alpha1
 metadata:
   name: my-service
 
-endpoints:
+endpoints:                          # list (in the descriptor only — the Workload CR uses a map)
   - name: api
     port: 8080
-    type: REST
+    type: HTTP                      # HTTP | GraphQL | Websocket | gRPC | TCP | UDP
     targetPort: 8080
     displayName: "REST API"
     basePath: "/api/v1"
@@ -162,15 +163,16 @@ endpoints:
       - external
 
 dependencies:
-  - component: backend-api
-    endpoint: api
-    visibility: project
-    project: other-project
-    envBindings:
-      address: BACKEND_URL
-      host: BACKEND_HOST
-      port: BACKEND_PORT
-      basePath: BACKEND_PATH
+  endpoints:                        # nested under .endpoints
+    - project: other-project        # optional; defaults to same project
+      component: backend-api
+      name: api                     # name of the target endpoint
+      visibility: project
+      envBindings:
+        address: BACKEND_URL
+        host: BACKEND_HOST
+        port: BACKEND_PORT
+        basePath: BACKEND_PATH
 
 configurations:
   env:
@@ -217,13 +219,17 @@ metadata:
   namespace: default
 spec:
   promotionPaths:
-    - sourceEnvironmentRef: development
+    - sourceEnvironmentRef:
+        name: development             # `kind: Environment` is implicit
       targetEnvironmentRefs:
         - name: staging
-    - sourceEnvironmentRef: staging
+    - sourceEnvironmentRef:
+        name: staging
       targetEnvironmentRefs:
         - name: production
 ```
+
+> **Important**: `sourceEnvironmentRef` is an **object** (`{name: <env>}`), not a plain string — same shape as `targetEnvironmentRefs[]`. `kind` defaults to `Environment` and is usually omitted.
 
 ## ReleaseBinding
 
@@ -240,7 +246,7 @@ spec:
     projectName: my-project
   releaseName: my-app-20260301-1
   state: Active
-  componentTypeEnvOverrides:
+  componentTypeEnvironmentConfigs:
     replicas: 3
   traitEnvironmentConfigs:
     storage:
@@ -282,39 +288,46 @@ spec:
 
 ## ComponentType (read-only for developers)
 
-Included for understanding what platform engineers configure. Developers pick types from `occ clustercomponenttype list`. For full authoring detail, see `openchoreo-platform-engineer/references/templates-and-workflows.md`.
+Simplified shape for understanding what platform engineers configure. Developers pick types from `occ clustercomponenttype list`. For full authoring detail (schema, templates, patches, validation), see `openchoreo-platform-engineer/references/component-types-and-traits.md`.
 
 ```yaml
 apiVersion: openchoreo.dev/v1alpha1
 kind: ComponentType               # or ClusterComponentType
 metadata:
-  name: service
-  namespace: default
+  name: web-service
+  namespace: default              # omit for ClusterComponentType
 spec:
-  workloadType: deployment
+  workloadType: deployment        # deployment | statefulset | cronjob | job | proxy
+  allowedTraits:
+    - kind: Trait                 # or ClusterTrait
+      name: persistent-volume
   allowedWorkflows:
-    - kind: Workflow
-      name: docker
-    - kind: Workflow
-      name: google-cloud-buildpacks
-  schema:
-    parameters:
-      replicas: "integer | default=1"
-      imagePullPolicy: "string | enum=Always,IfNotPresent,Never | default=IfNotPresent"
-    envOverrides:
-      replicas: "integer | default=1 min=1 max=10"
-      cpuLimit: "string | default=500m"
-      memoryLimit: "string | default=256Mi"
+    - kind: ClusterWorkflow
+      name: dockerfile-builder
+  parameters:
+    openAPIV3Schema:
+      type: object
+      properties:
+        replicas:
+          type: integer
+          default: 1
+          minimum: 1
+  environmentConfigs:
+    openAPIV3Schema:
+      type: object
+      properties:
+        resources:
+          type: object
+          default: {}
+          properties:
+            cpu:    { type: string, default: "100m" }
+            memory: { type: string, default: "256Mi" }
   resources:
-    - id: deployment
+    - id: deployment              # must match workloadType
       template:
         apiVersion: apps/v1
         kind: Deployment
-        metadata:
-          name: ${metadata.name}
-          namespace: ${metadata.namespace}
-        spec:
-          replicas: ${envOverrides.replicas}
+        # ... CEL-templated Kubernetes resource
 ```
 
 ## Trait (read-only for developers)
@@ -324,29 +337,42 @@ apiVersion: openchoreo.dev/v1alpha1
 kind: Trait                       # or ClusterTrait
 metadata:
   name: persistent-volume
-  namespace: default
+  namespace: default              # omit for ClusterTrait
 spec:
-  schema:
-    parameters:
-      volumeName: "string"
-      mountPath: "string"
-      containerName: "string | default=app"
-    envOverrides:
-      size: "string | default=10Gi"
-      storageClass: "string | default=standard"
+  parameters:
+    openAPIV3Schema:
+      type: object
+      properties:
+        volumeName: { type: string }
+        mountPath:  { type: string }
+        containerName:
+          type: string
+          default: main
+  environmentConfigs:
+    openAPIV3Schema:
+      type: object
+      properties:
+        size:
+          type: string
+          default: "10Gi"
+        storageClass:
+          type: string
+          default: "standard"
   creates:
     - template:
         apiVersion: v1
         kind: PersistentVolumeClaim
-        # ... templates with CEL expressions
+        # ... CEL-templated resource
   patches:
     - target:
+        kind: Deployment
         group: apps
         version: v1
-        kind: Deployment
       operations:
         - op: add
           path: /spec/template/spec/volumes/-
           value:
             name: ${parameters.volumeName}
 ```
+
+Both ComponentType and Trait use OpenAPI v3 JSON Schema under `parameters.openAPIV3Schema` and `environmentConfigs.openAPIV3Schema`.

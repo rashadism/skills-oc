@@ -98,11 +98,17 @@ When connecting to an unfamiliar cluster, explore in this order:
 
 **`list_release_bindings` requires both project and component**: You must pass both, not just project.
 
-**`get_workload_schema` before writing workload YAML**: Call this to discover the field shape rather than guessing. The `dependencies` field is an array of objects, not a map.
+**`get_workload_schema` before writing workload YAML**: Call this to discover the field shape rather than guessing. `dependencies` is an object with an `endpoints` array — see the gotcha below.
 
-**`dependencies` is an array, not a map**: The schema describes it as a JSON object but the API requires an array of dependency objects:
-```json
-[{"component": "...", "endpoint": "...", "visibility": "project", "envBindings": {"address": "ENV_VAR"}}]
+**`dependencies` is nested**: The Workload `dependencies` field is an **object** containing an `endpoints` array, not a flat array. Each entry uses `name` (target endpoint name), not `endpoint`:
+```yaml
+dependencies:
+  endpoints:
+    - component: backend-api
+      name: api                # the target endpoint name on backend-api
+      visibility: project       # project | namespace
+      envBindings:
+        address: BACKEND_URL
 ```
 Field renamed from `connections` in v1.0.0.
 

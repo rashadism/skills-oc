@@ -53,8 +53,8 @@ The runtime contract. Defines what image to run, what ports to expose, and what 
 
 **Key fields**:
 - `container`: image, command, args, env vars, files
-- `endpoints`: Named network interfaces with type and visibility
-- `dependencies`: Dependencies on other services with automatic env var injection (formerly `connections`)
+- `endpoints`: Map of named network interfaces with type (`HTTP`, `GraphQL`, `Websocket`, `gRPC`, `TCP`, `UDP`) and visibility
+- `dependencies.endpoints[]`: Connections to other components' endpoints, with automatic env var injection (renamed from `connections` in v1.0.0; nested under `dependencies.endpoints`, not flat at `dependencies`)
 
 ### Workload Descriptor
 A `workload.yaml` file placed in your source repository that tells the build workflow what endpoints, dependencies, and configurations your service has. The build process reads this and generates a proper Workload CR.
@@ -81,7 +81,7 @@ Platform-engineer-defined template that controls how a component deploys. Develo
 - `parameters`: Static config, same everywhere the release deploys (e.g., image pull policy)
 - `envOverrides`: The per-environment part of the ComponentType schema
 
-ReleaseBinding supplies the actual per-environment values for that schema under `componentTypeEnvOverrides`.
+ReleaseBinding supplies the actual per-environment values for that schema under `componentTypeEnvironmentConfigs`.
 
 ### Trait
 Composable capability attached to components. Adds resources (like PVCs) or modifies existing ones (inject env vars, add volumes) without changing the ComponentType.
@@ -98,10 +98,13 @@ A deployment target (dev, staging, prod). Maps to a DataPlane (Kubernetes cluste
 ### DeploymentPipeline
 Defines promotion paths between environments. A pipeline might be: development → staging → production.
 
-**Important**: `deploymentPipelineRef` in Project spec is now an object with `kind` and `name` fields (changed in v1.0.0 — previously a plain string).
+**Important**: `deploymentPipelineRef` in Project spec is an **object** (changed in v1.0.0 — previously a plain string). `kind` is optional and defaults to `DeploymentPipeline`:
 
 ```yaml
-# Correct (v1.0.0+)
+# Both of these are valid
+deploymentPipelineRef:
+  name: default
+
 deploymentPipelineRef:
   kind: DeploymentPipeline
   name: default
@@ -115,7 +118,7 @@ Immutable snapshot of Component + Workload + ComponentType + Traits at a point i
 
 ### ReleaseBinding
 Binds a ComponentRelease to an Environment. This is what triggers actual deployment. Supports environment-specific overrides:
-- `componentTypeEnvOverrides`: Replicas, resource limits, etc.
+- `componentTypeEnvironmentConfigs`: Replicas, resource limits, etc.
 - `traitEnvironmentConfigs`: Per-environment trait values keyed by trait `instanceName` (renamed from `traitOverrides` in v1.0.0).
 - `workloadOverrides`: Extra env vars, files for specific environments
 - `state`: `Active` (running) or `Undeploy` (removed)
@@ -174,11 +177,12 @@ Services within the same project can talk freely. For cross-project communicatio
 
 ```yaml
 dependencies:
-  - component: backend-api
-    endpoint: api
-    visibility: project
-    envBindings:
-      address: BACKEND_URL
+  endpoints:
+    - component: backend-api
+      name: api                       # name of the target endpoint
+      visibility: project
+      envBindings:
+        address: BACKEND_URL
 ```
 
-This injects `BACKEND_URL` with the resolved address. No hardcoded hostnames, no guessing service DNS names.
+This injects `BACKEND_URL` with the resolved address. No hardcoded hostnames, no guessing service DNS names. Note that connections live under `dependencies.endpoints[]`, not directly under `dependencies[]`.

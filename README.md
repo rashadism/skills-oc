@@ -79,12 +79,13 @@ For platform-level work: cluster setup, Helm, kubectl, planes, ComponentTypes, T
 
 | File | Contents |
 |------|----------|
-| `templates-and-workflows.md` | ComponentType, Trait, Workflow, CEL authoring |
+| `component-types-and-traits.md` | ComponentType, ClusterComponentType, Trait, ClusterTrait authoring (schema, templates, patches, validation) |
+| `workflows.md` | Workflow / ClusterWorkflow authoring (schema, runTemplate, ClusterWorkflowTemplates, CI governance) |
+| `cel.md` | CEL syntax, context variables, OpenChoreo built-in & helper functions used in all template authoring |
+| `authz.md` | AuthzRole / RoleBinding authoring, action catalogue, evaluation rules |
 | `troubleshooting.md` | Failure isolation, health checks, common patterns |
-| `cli-platform.md` | PE-specific `occ` commands, platform resource creation (Environment, DeploymentPipeline, Project), plane YAML schemas |
-| `mcp-platform.md` | PE-specific MCP workflows (initial setup, registering types/traits/workflows, observability validation) |
 
-For everything else (TLS, registries, identity providers, multi-cluster, GitOps, alerting, modules, upgrades), the skill points at the official [PE guide](https://openchoreo.dev/docs/platform-engineer-guide/).
+For platform setup and configuration (TLS, registries, identity providers, multi-cluster connectivity, GitOps, observability stack install, modules, upgrades, namespace management, Backstage), the skill points at the official [PE guide](https://openchoreo.dev/docs/platform-engineer-guide/).
 
 ---
 
@@ -196,10 +197,11 @@ openchoreo-developer/
 openchoreo-platform-engineer/
   SKILL.md                  # Platform engineer skill guide — loaded by AI agent
   references/
-    templates-and-workflows.md  # ComponentType, Trait, Workflow, CEL authoring
-    troubleshooting.md          # Failure isolation, health checks, common patterns
-    cli-platform.md             # PE-specific occ commands and platform resource schemas
-    mcp-platform.md             # PE-specific MCP workflows
+    component-types-and-traits.md  # ComponentType / Trait authoring
+    workflows.md                   # Workflow authoring + CI governance
+    cel.md                         # CEL syntax, context variables, helpers
+    authz.md                       # AuthzRole / RoleBinding authoring
+    troubleshooting.md             # Failure isolation, health checks, common patterns
 
 samples/
   install-openchoreo-on-local-colima/

@@ -23,7 +23,7 @@ occ component scaffold my-app --type deployment/web-application --skip-comments 
 occ component deploy my-app                                       # deploy latest release to root env
 occ component deploy my-app --to staging                          # promote to staging
 occ component deploy my-app --release my-app-20260126-143022-1    # deploy specific release
-occ component deploy my-app --set spec.componentTypeEnvOverrides.replicas=3
+occ component deploy my-app --set spec.componentTypeEnvironmentConfigs.replicas=3
 ```
 
 ### `component logs`

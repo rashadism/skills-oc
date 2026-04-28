@@ -219,15 +219,16 @@ endpoints:
       - external
 
 dependencies:
-  - component: backend-api      # target component name (required)
-    endpoint: api               # target endpoint name (required)
-    visibility: project         # project, namespace, or internal (required)
-    project: other-project      # target project (optional, defaults to same project)
-    envBindings:                # env vars injected with resolved addresses
-      address: BACKEND_URL      # full connection string
-      host: BACKEND_HOST        # hostname only
-      port: BACKEND_PORT        # port number only
-      basePath: BACKEND_PATH    # base path only
+  endpoints:                    # nested under .endpoints
+    - component: backend-api    # target component name (required)
+      name: api                 # target endpoint name on the component (required)
+      visibility: project       # project | namespace (required)
+      project: other-project    # target project (optional, defaults to same project)
+      envBindings:              # env vars injected with resolved addresses
+        address: BACKEND_URL    # full connection string
+        host: BACKEND_HOST      # hostname only
+        port: BACKEND_PORT      # port number only
+        basePath: BACKEND_PATH  # base path only
 
 configurations:
   env:
@@ -294,7 +295,7 @@ occ component deploy my-app --to production
 
 # Deploy with env-specific overrides
 occ component deploy my-app --to production \
-  --set spec.componentTypeEnvOverrides.replicas=3
+  --set spec.componentTypeEnvironmentConfigs.replicas=3
 ```
 
 ## ReleaseBinding with Overrides
@@ -312,7 +313,7 @@ spec:
   owner:
     componentName: my-app
     projectName: default
-  componentTypeEnvOverrides:
+  componentTypeEnvironmentConfigs:
     replicas: 3
   traitEnvironmentConfigs:
     data-storage:             # keyed by trait instanceName
@@ -353,12 +354,13 @@ Backend component uses `appPath: ./backend`, frontend uses `appPath: ./frontend`
 Frontend's workload.yaml uses dependencies:
 ```yaml
 dependencies:
-  - component: backend-service
-    endpoint: api
-    visibility: project
-    envBindings:
-      host: BACKEND_HOST
-      port: BACKEND_PORT
+  endpoints:
+    - component: backend-service
+      name: api                       # target endpoint name
+      visibility: project
+      envBindings:
+        host: BACKEND_HOST
+        port: BACKEND_PORT
 ```
 
 The platform injects the resolved backend host and port. This is safer for nginx-style reverse proxies because it avoids accidentally doubling a backend endpoint `basePath`.
@@ -441,8 +443,8 @@ workloadOverrides:
       - key: FEATURE_FLAG_X
         value: "true"
 
-# componentTypeEnvOverrides for things in the ComponentType schema
-componentTypeEnvOverrides:
+# componentTypeEnvironmentConfigs for things in the ComponentType schema
+componentTypeEnvironmentConfigs:
   replicas: 3
   cpuLimit: "1000m"
 ```
@@ -452,14 +454,15 @@ componentTypeEnvOverrides:
 When using Workload dependencies, the platform automatically injects env vars with resolved service addresses. You control the env var names through `envBindings`:
 ```yaml
 dependencies:
-  - component: backend-api
-    endpoint: api
-    visibility: project
-    envBindings:
-      address: BACKEND_URL    # full connection string; may include endpoint basePath
-      host: BACKEND_HOST      # e.g., backend-api
-      port: BACKEND_PORT      # e.g., 8080
-      basePath: BACKEND_PATH  # e.g., /api
+  endpoints:
+    - component: backend-api
+      name: api               # target endpoint name on backend-api
+      visibility: project
+      envBindings:
+        address: BACKEND_URL    # full connection string; may include endpoint basePath
+        host: BACKEND_HOST      # e.g., backend-api
+        port: BACKEND_PORT      # e.g., 8080
+        basePath: BACKEND_PATH  # e.g., /api
 ```
 
 Your app can read whichever form fits the integration point.
@@ -475,17 +478,19 @@ Your app can read whichever form fits the integration point.
 ```yaml
 # Wrong — injects "host:port", not a postgres DSN
 dependencies:
-  - component: my-postgres
-    endpoint: tcp
-    visibility: project
-    envBindings:
-      address: DATABASE_URL   # ← will be "host:5432", breaks pgx/GORM
+  endpoints:
+    - component: my-postgres
+      name: tcp
+      visibility: project
+      envBindings:
+        address: DATABASE_URL   # ← will be "host:5432", breaks pgx/GORM
 
 # Right — declare connection for topology, set DSN explicitly
 dependencies:
-  - component: my-postgres
-    endpoint: tcp
-    visibility: project        # no envBindings
+  endpoints:
+    - component: my-postgres
+      name: tcp
+      visibility: project       # no envBindings
 container:
   env:
     - key: DATABASE_URL
@@ -721,16 +726,16 @@ Apply workloads using `occ apply -f <file>` for batches. Each workload must incl
 2. **All env vars from the official manifest** — `PORT`, feature flags, and any explicit service addresses not covered by dependencies
 3. Dependencies for service-to-service communication (using `envBindings`)
 
-**`dependencies` is always an array, not a map:**
+**`dependencies` is an object with an `endpoints` array** — each entry uses `name` for the target endpoint:
 
 ```yaml
 dependencies:
-- name: cache                     # required name field
-  component: my-cache
-  endpoint: tcp
-  visibility: project
-  envBindings:
-    address: CACHE_ADDR
+  endpoints:
+    - component: my-cache
+      name: tcp                     # name of the target endpoint on my-cache
+      visibility: project
+      envBindings:
+        address: CACHE_ADDR
 ```
 
 ### Common patterns when running cloud-native apps outside their native cloud

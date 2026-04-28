@@ -3,7 +3,7 @@ name: openchoreo-platform-engineer
 description: |
   Use this whenever an OpenChoreo task needs a platform-level change or investigation: cluster setup, Helm upgrades, plane connectivity, platform resources, ComponentTypes, Traits, Workflows, gateways, secret stores, identity, GitOps, observability, or cluster-side debugging. Prefer MCP tools, then occ, over kubectl. If the same task also involves deploying or debugging an application through `occ`, activate `openchoreo-developer` too instead of waiting to escalate later.
 metadata:
-  version: 1.0.0
+  version: "1.0.0"
 ---
 
 # OpenChoreo Platform Engineer Guide
@@ -56,12 +56,18 @@ Foundational material lives in `openchoreo-core/references/` (concepts, CLI inst
 
 PE-specific material in this skill:
 
-- `references/templates-and-workflows.md` for ComponentType, Trait, Workflow, and CEL authoring
-- `references/troubleshooting.md` for failure isolation, health checks, log locations, and common failure patterns
-- `references/cli-platform.md` for PE-specific `occ` commands, platform resource creation (Environment, DeploymentPipeline, Project), and plane YAML schemas (DataPlane, WorkflowPlane, ObservabilityPlane, NotificationChannel)
-- `references/mcp-platform.md` for PE-specific MCP workflows (initial setup, registering types/traits/workflows, validating observability) and PE-specific gotchas
+**Authoring:**
+- `references/component-types-and-traits.md` — ComponentType, ClusterComponentType, Trait, ClusterTrait authoring (schema, templates, patches, validation rules)
+- `references/workflows.md` — Workflow / ClusterWorkflow authoring (schema, runTemplate, ClusterWorkflowTemplates, externalRefs, CI governance via `allowedWorkflows`)
+- `references/cel.md` — CEL syntax, context variables, OpenChoreo built-in and helper functions used by all of the above
+- `references/authz.md` — `AuthzRole` / `ClusterAuthzRole` / `AuthzRoleBinding` / `ClusterAuthzRoleBinding` authoring, action catalogue, request evaluation
 
-For PE topics not bundled in these references — TLS / external CA, container registries, identity providers, namespace management, multi-cluster connectivity, deployment topology, GitOps automations, observability adapter modules, API gateway modules, alerting, authorization roles, Backstage configuration, upgrades — consult the official PE guide at **https://openchoreo.dev/docs/platform-engineer-guide/**. The docs are the source of truth for those topics; do not rely on memory.
+**Tooling:**
+- `references/troubleshooting.md` — failure isolation, health checks, log locations, common failure patterns
+
+`occ` install / login, command surface, MCP tool catalogue, and universal Project / Environment / DeploymentPipeline / ReleaseBinding YAML shapes all live in `openchoreo-core/`.
+
+For PE topics not bundled in these references — TLS / external CA, container registries, identity provider configuration, namespace management, multi-cluster connectivity, deployment topology, GitOps automations, observability adapter modules, API gateway modules, alert storage backend choice, IdP / bootstrap auth mappings, Backstage configuration, upgrades — consult the official PE guide at **https://openchoreo.dev/docs/platform-engineer-guide/**. The docs are the source of truth for those topics; do not rely on memory.
 
 ## Discovery-first workflow
 
@@ -123,8 +129,9 @@ If the platform change succeeded but the app still fails, hand off to or continu
 
 - **Default to the `default` namespace.** Unless the user explicitly asks to create a new namespace, provision all environments, pipelines, and projects inside the existing `default` namespace. Always ask the user before creating a new namespace — new namespaces represent a significant organisational boundary and should be a conscious decision.
 - **Prefer MCP tools → occ / REST API → kubectl (last resort).** Most platform resource management works without kubectl.
-- `create_environment` and `create_deployment_pipeline` are not MCP tools. Environments use `occ apply -f`. Pipelines require `kubectl apply -f` due to an occ schema bug — see `references/cli-platform.md` → "Create a DeploymentPipeline".
+- `create_environment` and `create_deployment_pipeline` are not MCP tools — use `occ apply -f` for both. For `DeploymentPipeline`, `spec.promotionPaths[].sourceEnvironmentRef` must be an **object** `{name: <env>}` (or `{kind: Environment, name: <env>}`), not a plain string — same as `targetEnvironmentRefs[]`.
 - `create_project` via MCP supports a `deployment_pipeline` parameter — pass it explicitly to avoid defaulting to the `default` pipeline.
+- `occ apply -f -` (stdin) does not work — error `path - does not exist`. Always write YAML to a temp file first, then apply.
 - `occ login --client-credentials` does not work with `service_mcp_client` (`unauthorized_client`). Use browser-based `occ login`.
 - Upgrade order matters; do not move a remote plane ahead of the control plane.
 - Scope matters; cluster-scoped and namespace-scoped resources are not interchangeable.

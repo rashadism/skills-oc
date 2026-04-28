@@ -3,7 +3,7 @@ name: openchoreo-developer
 description: |
   Use this whenever the task is about working with an application on OpenChoreo: deploying, updating, debugging, explaining resources, writing app-facing YAML, or using `occ`. If the task also needs kubectl access, platform resources, cluster-side debugging, or platform configuration changes, activate `openchoreo-platform-engineer` too instead of treating it as a later escalation.
 metadata:
-  version: 1.0.0
+  version: "1.0.0"
 ---
 
 # OpenChoreo Developer Guide
@@ -125,7 +125,7 @@ Keep these because they are durable and routinely useful:
 - **For third-party/public apps: default to pre-built images (BYO), not source builds.** Source builds commonly fail because third-party Dockerfiles use multi-platform syntax (`ARG BUILDPLATFORM`) that OpenChoreo's buildah builder does not support. If a build exits 125 with a `BUILDPLATFORM` error, switch to BYO immediately
 - **Before deploying any third-party app: fetch the official Kubernetes or Helm manifests** and extract every required env var per service — dependencies inject service addresses but do not provide `PORT`, feature flags, or vendor SDK disable flags
 - **`create_component` without `workflow` for BYO image deployments** — adding a workflow to a BYO component causes unnecessary failed builds
-- **`dependencies` in workload spec is always an array, not a map** — each entry must include a `name` field (field renamed from `connections` in v1.0.0)
+- **`dependencies` in workload spec is an object containing an `endpoints` array** — `dependencies.endpoints[]`, not flat `dependencies[]`. Each entry uses `name` (the target endpoint name on the dependency component), not `endpoint`. Field renamed from `connections` in v1.0.0.
 - **Cloud-native apps often bundle vendor SDKs** (profilers, tracers, exporters) that crash outside their target cloud. If a service crash-loops before logging "listening on port X", look for a native module load error and apply the relevant disable flag from the official manifests
 
 ## Escalation rule
@@ -146,5 +146,5 @@ Activate `openchoreo-platform-engineer` for the full PE escalation surface and r
 - Creating source-build components (with `workflow`) for third-party apps that have pre-built images — this produces failed builds and clutters the UI; always check for pre-built images first
 - Omitting env vars from official manifests when deploying third-party apps — always fetch and apply the exact env vars the upstream manifests specify (`PORT`, feature flags, vendor SDK disable flags)
 - Assuming a deployment is healthy because `status: Ready` without checking application logs — a crash-looping container can briefly appear Ready; always confirm with `query_component_logs`
-- Setting `dependencies` as a YAML map instead of an array — the API requires an array; each entry must have a `name` field
+- Putting connection entries directly under `dependencies:` as a flat list — the canonical shape is `dependencies.endpoints: [...]`, with `name` for the target endpoint (not `endpoint`)
 - Assuming dependency-injected service addresses are the only env vars needed — many apps also require `PORT`, telemetry disable flags, and optional service placeholders to start cleanly
