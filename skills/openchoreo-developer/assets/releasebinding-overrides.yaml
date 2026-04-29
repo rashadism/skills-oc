@@ -1,0 +1,32 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: ReleaseBinding
+metadata:
+  name: <COMPONENT_NAME>-<ENVIRONMENT>
+  namespace: default
+spec:
+  environment: <ENVIRONMENT>
+  owner:
+    componentName: <COMPONENT_NAME>
+    projectName: default
+  componentTypeEnvironmentConfigs:
+    replicas: 3
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "256Mi"
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+  traitEnvironmentConfigs:
+    <TRAIT_INSTANCE_NAME>:
+      enabled: true
+  workloadOverrides:
+    container:
+      env:
+        - key: LOG_LEVEL
+          value: warn
+      files:
+        - key: app.toml
+          mountPath: /etc/app
+          value: |
+            mode = "production"

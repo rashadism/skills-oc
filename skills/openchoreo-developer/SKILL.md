@@ -63,8 +63,20 @@ Foundational material:
 
 Recipes (one task per file, MCP first then `occ` fallback):
 
+Build & Deploy
 - `references/recipes/deploy-prebuilt-image.md` — BYOI: deploy an existing image as a Component + Workload, including Project setup and private-registry variant
 - `references/recipes/build-from-source.md` — Build a container image from a Git repo via CI workflow, optional `workload.yaml` descriptor, private-Git and auto-build-on-push variants
+- `references/recipes/deploy-and-promote.md` — First-environment deploy, promotion across the pipeline, rollback to a previous release, undeploy / redeploy
+
+Configure
+- `references/recipes/configure-workload.md` — Endpoints, env vars, config files, ports/replicas, trait attachment
+- `references/recipes/connect-components.md` — Endpoint dependencies (same-project + cross-project) with env-var injection
+- `references/recipes/manage-secrets.md` — `SecretReference` patterns, secret-referenced env vars and files, registry / Git auth variants
+- `references/recipes/override-per-environment.md` — Per-environment replicas / resources / traits / workload overrides via ReleaseBinding
+
+Operate
+- `references/recipes/inspect-and-debug.md` — Status conditions, runtime logs, pod-level events, crashloop investigation, common failure matrix, metrics + traces
+- `references/recipes/attach-alerts.md` — `observability-alert-rule` trait, log + metric alerts, per-environment channels, incidents and AI RCA
 
 Long-form developer guide:
 
