@@ -1,16 +1,19 @@
 ---
 name: openchoreo-platform-engineer
 description: |
-  Use this whenever an OpenChoreo task needs a platform-level change or investigation: cluster setup, Helm upgrades, plane connectivity, platform resources, ComponentTypes, Traits, Workflows, gateways, secret stores, identity, GitOps, observability, or cluster-side debugging. Prefer MCP tools, then occ, over kubectl. If the same task also involves deploying or debugging an application through `occ`, activate `openchoreo-developer` too instead of waiting to escalate later.
+  Use whenever an OpenChoreo task needs a platform-level change or investigation: cluster setup, Helm upgrades, plane connectivity, platform resources, ComponentTypes, Traits, Workflows, gateways, secret stores, identity, GitOps, observability, or cluster-side debugging. ALWAYS activate `openchoreo-core` alongside this skill — it holds the resource concepts, `occ` CLI, MCP tool catalog, and universal YAML schemas every PE task needs. Prefer MCP tools, then occ, over kubectl. Also activate `openchoreo-developer` when the task involves deploying or debugging an application through `occ`.
 metadata:
   version: "1.0.0"
+  requires:
+    skills:
+      - openchoreo-core
 ---
 
 # OpenChoreo Platform Engineer Guide
 
-Help with OpenChoreo platform-level work. Keep this file generic and pull specifics from the reference docs or the live cluster only when needed.
+> **PREREQUISITE — activate `openchoreo-core` now.** Before answering any PE task, also load `openchoreo-core/SKILL.md` and consult its references (`concepts.md`, `cli.md`, `mcp.md`, `resource-schemas.md`) whenever you'd otherwise reach for resource concepts, `occ` commands, MCP tool details, or YAML schemas. Those foundations are not repeated in this skill — every PE flow assumes them.
 
-> **PREREQUISITE**: Read `openchoreo-core/SKILL.md` and the relevant references under `openchoreo-core/references/` before reaching for skill-specific deep-dives. Core covers the resource model, `occ` install/login, the MCP tool catalog, and universal YAML schemas — none of which are repeated here.
+Help with OpenChoreo platform-level work. Keep this file generic and pull specifics from the reference docs or the live cluster only when needed.
 
 ## Scope and pairing
 

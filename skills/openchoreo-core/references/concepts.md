@@ -49,7 +49,11 @@ A deployable unit. References a ComponentType that defines how it's deployed. Th
 **Example**: Each microservice, web frontend, or background job is a separate component.
 
 ### Workload
-The runtime contract. Defines what image to run, what ports to expose, and what services to connect to. Created automatically by source builds or manually for pre-built images (BYOI).
+The runtime contract. Defines what image to run, what ports to expose, and what services to connect to.
+
+**How it gets created**:
+- **BYO image** (Component has no `spec.workflow`): the developer creates it explicitly via `create_workload` MCP / `occ workload create` / `occ apply -f`.
+- **Source build** (Component has `spec.workflow`): the build's `generate-workload` step **auto-generates it**. The workload is always named `{component}-workload` — the build overrides any `metadata.name` from the descriptor. The build inlines `workload.yaml` from the source repo if present; otherwise the workload contains only the container image.
 
 **Key fields**:
 - `container`: image, command, args, env vars, files
@@ -57,9 +61,13 @@ The runtime contract. Defines what image to run, what ports to expose, and what 
 - `dependencies.endpoints[]`: Connections to other components' endpoints, with automatic env var injection (renamed from `connections` in v1.0.0; nested under `dependencies.endpoints`, not flat at `dependencies`)
 
 ### Workload Descriptor
-A `workload.yaml` file placed in your source repository that tells the build workflow what endpoints, dependencies, and configurations your service has. The build process reads this and generates a proper Workload CR.
+A `workload.yaml` file placed in your source repository — **the developer's source of truth** for the source-build component's runtime contract: endpoints, dependencies, env vars, file mounts, schemas. Hand-maintained, not auto-generated.
+
+The build's `generate-workload` step runs `occ workload create --descriptor workload.yaml` and produces the Workload CR from it. Without `workload.yaml`, the auto-generated Workload contains only the image and has no routing.
 
 **Placement**: Must be at the root of the `appPath` directory. If `appPath` is `/backend`, place it at `/backend/workload.yaml`. Not the docker context root, not the repo root (unless `appPath` is `.`).
+
+**Preferred enrichment path**: edit `workload.yaml` in the repo, commit, rebuild. The new workload spec flows through the build. Reach for `update_workload` MCP only when rebuilding isn't possible.
 
 For the full descriptor schema and source-build flow, see `openchoreo-developer/references/deployment-guide.md`.
 

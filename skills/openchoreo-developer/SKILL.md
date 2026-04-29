@@ -1,16 +1,19 @@
 ---
 name: openchoreo-developer
 description: |
-  Use this whenever the task is about working with an application on OpenChoreo: deploying, updating, debugging, explaining resources, writing app-facing YAML, or using `occ`. If the task also needs kubectl access, platform resources, cluster-side debugging, or platform configuration changes, activate `openchoreo-platform-engineer` too instead of treating it as a later escalation.
+  Use whenever the task is about working with an application on OpenChoreo: deploying, updating, debugging, explaining resources, writing app-facing YAML, or using `occ`. ALWAYS activate `openchoreo-core` alongside this skill — it holds the resource concepts, `occ` CLI, MCP tool catalog, and universal YAML schemas every developer task needs. Also activate `openchoreo-platform-engineer` when the task needs kubectl, platform resources (DataPlane, ComponentType, Trait, Workflow), or cluster-side debugging.
 metadata:
   version: "1.0.0"
+  requires:
+    skills:
+      - openchoreo-core
 ---
 
 # OpenChoreo Developer Guide
 
-Help with application-level work on OpenChoreo. Keep this file lean, discover the current platform shape from `occ`, and read detailed references only when the task actually needs them.
+> **PREREQUISITE — activate `openchoreo-core` now.** Before answering any developer task, also load `openchoreo-core/SKILL.md` and consult its references (`concepts.md`, `cli.md`, `mcp.md`, `resource-schemas.md`) whenever you'd otherwise reach for resource concepts, `occ` commands, MCP tool details, or YAML schemas. Those foundations are not repeated in this skill — every developer flow assumes them.
 
-> **PREREQUISITE**: Read `openchoreo-core/SKILL.md` and the relevant references under `openchoreo-core/references/` before reaching for skill-specific deep-dives. Core covers the resource model, `occ` install/login, the MCP tool catalog, and universal YAML schemas — none of which are repeated here.
+Help with application-level work on OpenChoreo. Keep this file lean, discover the current platform shape from `occ`, and read detailed references only when the task actually needs them.
 
 ## Scope and pairing
 
@@ -117,12 +120,13 @@ Keep these because they are durable and routinely useful:
 - Default to MCP tools first, then `occ`; avoid `kubectl` — if the task genuinely needs it, that is a PE boundary or a mixed-skill task
 - `occ <resource> get <name>` returns full YAML and is a primary debugging tool
 - Prefer scaffolding and samples over hand-written first drafts
-- Source-build Components use `spec.workflow`; `workload.yaml` belongs at the root of the selected `appPath`
+- Source-build Components use `spec.workflow`; `workload.yaml` belongs at the root of the selected `appPath`. **The build auto-generates the Workload as `{component}-workload`** — do NOT call `create_workload` for source-build components. To enrich the workload's endpoints / dependencies / env vars: preferred path is edit `workload.yaml` in the repo and rebuild; fallback is `update_workload` MCP / `occ apply -f` against the existing `{component}-workload` name (only when rebuilding isn't possible).
 - Use ReleaseBinding status for the actual deployed URLs
 - When platform capabilities are missing or broken, escalate clearly or activate `openchoreo-platform-engineer`
 - **For third-party/public apps: default to pre-built images (BYO), not source builds.** Source builds commonly fail because third-party Dockerfiles use multi-platform syntax (`ARG BUILDPLATFORM`) that OpenChoreo's buildah builder does not support. If a build exits 125 with a `BUILDPLATFORM` error, switch to BYO immediately
 - **Before deploying any third-party app: fetch the official Kubernetes or Helm manifests** and extract every required env var per service — dependencies inject service addresses but do not provide `PORT`, feature flags, or vendor SDK disable flags
-- **`create_component` without `workflow` for BYO image deployments** — adding a workflow to a BYO component causes unnecessary failed builds
+- **`create_component` without `workflow` for BYO image deployments** — adding a workflow to a BYO component causes unnecessary failed builds. Then call `create_workload` to define the runtime spec.
+- **For source-build (Component with `spec.workflow`): never call `create_workload`** — the build auto-generates `{component}-workload`. Use `update_workload` only to patch the auto-generated workload after the build, when the repo has no `workload.yaml`.
 - **`dependencies` in workload spec is an object containing an `endpoints` array** — `dependencies.endpoints[]`, not flat `dependencies[]`. Each entry uses `name` (the target endpoint name on the dependency component), not `endpoint`. Field renamed from `connections` in v1.0.0.
 - **Cloud-native apps often bundle vendor SDKs** (profilers, tracers, exporters) that crash outside their target cloud. If a service crash-loops before logging "listening on port X", look for a native module load error and apply the relevant disable flag from the official manifests
 

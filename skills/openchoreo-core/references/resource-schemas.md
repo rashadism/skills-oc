@@ -192,6 +192,8 @@ configurations:
 
 The descriptor and the Workload CR both use `name`/`key` plus `valueFrom.secretKeyRef`. The build workflow merges the built image into the descriptor to produce the Workload CR.
 
+> **The descriptor's `metadata.name` is read but ignored.** The build always names the generated Workload `{component}-workload`, regardless of what's in `workload.yaml`. So a Component named `api-service` produces a Workload named `api-service-workload`. Query the workload by that name (e.g. `occ workload get api-service-workload`), not by the component name.
+
 ## Environment
 
 ```yaml

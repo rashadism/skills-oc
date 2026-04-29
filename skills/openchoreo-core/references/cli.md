@@ -2,6 +2,8 @@
 
 Single source of truth for the `occ` CLI: install, login, the full command surface, workflow commands (scaffold, deploy, build, logs), and every gotcha. Used by `openchoreo-developer`, `openchoreo-install`, and `openchoreo-platform-engineer` as their CLI reference — no per-skill duplicates.
 
+> **Reach for `occ` when MCP doesn't cover the operation, or for inherently CLI-only flows: `login`, `version`, `config context`, `apply -f`, `component scaffold`, single-resource `get` for inspection.** For resource CRUD, schema discovery, and observability queries (logs, metrics, traces, alerts) prefer MCP — see `mcp.md`. Full preference logic and the per-operation override is in `SKILL.md` → "Tool preference order".
+
 For platform-resource creation patterns specifically (Environment, DeploymentPipeline, Project YAML applied via `occ apply -f`), the YAML shapes live in `resource-schemas.md` and detailed authoring sits in the workflow skills (`openchoreo-platform-engineer/references/component-types-and-traits.md`, `workflows.md`, `authz.md`).
 
 ## Install
@@ -52,7 +54,12 @@ occ config context add myctx --controlplane default --credentials default \
 
 # 5. Use the context
 occ config context use myctx
+
+# 6. Inspect — list every context, current one marked with *
+occ config context list
 ```
+
+> **There is no `occ context` command.** Context management lives under `occ config context`. The full subcommand set is `add | list | use | update | delete` — no `current` / `show` / `get`. To see which context is active, use `occ config context list` and look for the `*` marker.
 
 For local installs, ensure `/etc/hosts` has entries for `api.openchoreo.localhost`, `thunder.openchoreo.localhost`, and `observer.openchoreo.localhost` pointing to `127.0.0.1`.
 
@@ -275,6 +282,8 @@ occ workload list                    # what workloads exist?
 **`occ apply -f -` (stdin) does not work** — see the `apply` section above. Pipe-into-occ patterns must be replaced with temp-file patterns.
 
 **`service_mcp_client` cannot be used for `occ login --client-credentials`** — see Setup Flow above.
+
+**There is no `occ context` top-level command.** Use `occ config context <subcommand>`. To inspect the currently active context, use `occ config context list` (active one is marked `*`) — there is no `current` / `show` / `get` subcommand. See Setup Flow above.
 
 **Docker workflow paths are repo-relative**: `repository.appPath` selects the source subdirectory and `workload.yaml`, but `docker.context` and `docker.filePath` must still point at real repo-root-relative paths. If `appPath` is `./backend`, a Dockerfile under `backend/` should use `docker.context: ./backend` and `docker.filePath: ./backend/Dockerfile`.
 

@@ -1,16 +1,19 @@
 ---
 name: openchoreo-install
 description: |
-  Use this for the **initial install** of OpenChoreo on a Kubernetes cluster: installing prerequisites, registering planes (control, data, workflow, observability) for the first time, troubleshooting installation failures, or tearing down an installation. Do NOT use for post-install operations (Helm upgrades, day-2 plane changes, registering additional planes) — those belong to `openchoreo-platform-engineer` or the official PE guide.
+  Use for the **initial install** of OpenChoreo on a Kubernetes cluster: installing prerequisites, registering planes (control, data, workflow, observability) for the first time, troubleshooting installation failures, or tearing down an installation. ALWAYS activate `openchoreo-core` alongside this skill — it holds the resource concepts, `occ` CLI, and YAML schemas the install steps reference. Do NOT use for post-install operations (Helm upgrades, day-2 plane changes, registering additional planes) — those belong to `openchoreo-platform-engineer` or the official PE guide.
 metadata:
   version: "1.0.0"
+  requires:
+    skills:
+      - openchoreo-core
 ---
 
 # OpenChoreo Install Guide
 
-Help with installing OpenChoreo on a Kubernetes cluster. This skill covers the full single-cluster installation path: prerequisites, control plane, data plane, workflow plane, and observability plane.
+> **PREREQUISITE — activate `openchoreo-core` now.** Before running any install task, also load `openchoreo-core/SKILL.md` and consult its references (`concepts.md`, `cli.md`, `mcp.md`, `resource-schemas.md`) whenever you'd otherwise reach for resource concepts, `occ` commands, MCP tool details, or plane / Project / Environment YAML shapes. Those foundations are not repeated in this skill.
 
-> **PREREQUISITE**: Read `openchoreo-core/SKILL.md` and the relevant references under `openchoreo-core/references/` before reaching for skill-specific deep-dives. Core covers the resource model, `occ` install/login, the MCP tool catalog, and universal YAML schemas — none of which are repeated here.
+Help with installing OpenChoreo on a Kubernetes cluster. This skill covers the full single-cluster installation path: prerequisites, control plane, data plane, workflow plane, and observability plane.
 
 ## Scope
 

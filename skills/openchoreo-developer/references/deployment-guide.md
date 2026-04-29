@@ -129,6 +129,67 @@ Follow build logs: `occ component workflow logs my-app -f`
 
 **Important project rule for source builds**: The Component's `spec.owner.projectName` and the active `occ` context project must agree. The workflow's parameter shape comes from the workflow's own schema — inspect with `occ clusterworkflow get <name>` to confirm what the build pipeline accepts.
 
+### The Workload is auto-generated — don't create one yourself
+
+For source-build components, **never call `create_workload` / `occ workload create`**. The build's `generate-workload` step does it for you:
+
+- It produces a Workload named **`{component}-workload`** (always — the descriptor's `metadata.name` is ignored).
+- If `workload.yaml` exists at `appPath` root in the repo, the build inlines it: endpoints, dependencies, env vars, files all flow through.
+- If `workload.yaml` is missing, the auto-generated Workload contains **only the container image** — no endpoints, no routing, no dependencies. The component will deploy but won't route any traffic.
+
+After the build, query the workload by its real name:
+
+```bash
+occ workload list --component my-app                # see {component}-workload appear
+occ workload get my-app-workload                    # NOT 'my-app' — that returns "not found"
+```
+
+### Enriching the auto-generated Workload
+
+If you need to add endpoints, dependencies, or env vars after a build, there are two paths:
+
+**Preferred — edit `workload.yaml` and rebuild.** Commit the descriptor changes, then `occ component workflow run my-app`. The new build produces a fresh `{component}-workload` with the descriptor inlined. This is the canonical path: source of truth lives in the repo, deployments are reproducible, history is auditable.
+
+**Fallback — `update_workload` against the auto-generated name.** Use this only when rebuilding isn't possible (e.g., the repo has no `workload.yaml` and you can't edit the source). Either via MCP:
+
+```
+update_workload(namespace, workload_name='my-app-workload', workload_spec={...})
+```
+
+or `occ apply -f` over the existing workload name:
+
+```yaml
+# /tmp/my-app-workload.yaml
+apiVersion: openchoreo.dev/v1alpha1
+kind: Workload
+metadata:
+  name: my-app-workload                # <component>-workload, NOT my-app
+  namespace: default
+  labels:
+    openchoreo.dev/project: my-project
+    openchoreo.dev/component: my-app
+spec:
+  owner:
+    projectName: my-project
+    componentName: my-app
+  container:
+    image: <existing image from the auto-generated workload>
+  endpoints:
+    api:
+      type: HTTP
+      port: 8080
+      visibility: ["external"]
+  # … endpoints, dependencies.endpoints[], etc.
+```
+
+```bash
+occ apply -f /tmp/my-app-workload.yaml
+```
+
+> **Don't omit `endpoints:`.** The default ComponentType (`deployment/service`) has a validation rule `${size(workload.endpoints) > 0}` — a Workload with no endpoints will cause `RenderingFailed` on the ReleaseBinding. If your component genuinely has no endpoints (a worker / job), use a worker / cronjob ComponentType instead.
+
+> **Don't drop the image** when applying an enriched workload. The auto-generated workload already has the built image set. If you `occ apply -f` a Workload without the image (or with a wrong / placeholder image), you overwrite it. Get the current image first via `occ workload get my-app-workload | grep image`.
+
 ## How the CI Pipeline Works
 
 Understanding the build flow helps debug issues and explains why `workload.yaml` exists.
