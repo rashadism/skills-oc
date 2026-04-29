@@ -42,11 +42,9 @@ Claude Code handles the rest — ~6 minutes to a fully running cluster.
 
 ## Skills in this repository
 
-### `openchoreo-core`
+Each skill is self-contained and includes the foundational `concepts.md`, `cli.md`, `mcp.md`, and `resource-schemas.md` references — install any skill standalone without needing the others.
 
-Foundational reference shared by every other OpenChoreo skill: resource concepts, `occ` CLI install/login, MCP tool catalog, and resource YAML schemas. Activated as a prerequisite by the workflow skills, and directly when the task is a definitional or lookup question.
-
-**References included:**
+**Foundational references shipped in every skill:**
 
 | File | Contents |
 |------|----------|
@@ -61,13 +59,11 @@ Foundational reference shared by every other OpenChoreo skill: resource concepts
 
 For application-level work: deploying apps, debugging Components and Workloads, writing app-facing YAML, and operating through `occ` or the MCP server.
 
-**References included:**
+**Skill-specific references:**
 
 | File | Contents |
 |------|----------|
 | `deployment-guide.md` | BYOI, source builds, `workload.yaml`, dependencies, promotion, env vars / config / secrets, third-party apps walkthrough |
-
-CLI commands and MCP workflows for developer tasks live in `openchoreo-core/` — see the table above.
 
 ---
 
@@ -75,7 +71,7 @@ CLI commands and MCP workflows for developer tasks live in `openchoreo-core/` �
 
 For platform-level work: cluster setup, Helm, kubectl, planes, ComponentTypes, Traits, Workflows, gateways, secret stores, and observability.
 
-**References included:**
+**Skill-specific references:**
 
 | File | Contents |
 |------|----------|
@@ -166,18 +162,16 @@ Each sample includes the exact prompt used, a step-by-step account of what the A
 
 ## Repository structure
 
+Every skill ships the four foundational references (`concepts.md`, `cli.md`, `mcp.md`, `resource-schemas.md`) plus its own skill-specific references, so any skill can be installed standalone.
+
 ```
-openchoreo-core/
-  SKILL.md                  # Foundational reference — prerequisite for the other skills
+openchoreo-install/
+  SKILL.md                  # Install skill guide — loaded by AI agent
   references/
     concepts.md             # Resource model, cell architecture, planes
     cli.md                  # occ install, login, command surface, universal gotchas
     mcp.md                  # MCP tool catalog (control plane + observability)
     resource-schemas.md     # Universal YAML shapes
-
-openchoreo-install/
-  SKILL.md                  # Install skill guide — loaded by AI agent
-  references/
     local-colima.md         # Colima/k3s install path (openchoreo.localhost)
     local-k3d.md            # k3d install path
     prerequisites.md        # Tool versions, CRDs, cert-manager, kgateway, OpenBao
@@ -190,11 +184,19 @@ openchoreo-install/
 openchoreo-developer/
   SKILL.md                  # Developer skill guide — loaded by AI agent
   references/
+    concepts.md             # Resource model, cell architecture, planes
+    cli.md                  # occ install, login, command surface, universal gotchas
+    mcp.md                  # MCP tool catalog (control plane + observability)
+    resource-schemas.md     # Universal YAML shapes
     deployment-guide.md     # BYOI, source builds, workload.yaml, dependencies, promotion, third-party apps
 
 openchoreo-platform-engineer/
   SKILL.md                  # Platform engineer skill guide — loaded by AI agent
   references/
+    concepts.md                    # Resource model, cell architecture, planes
+    cli.md                         # occ install, login, command surface, universal gotchas
+    mcp.md                         # MCP tool catalog (control plane + observability)
+    resource-schemas.md            # Universal YAML shapes
     component-types-and-traits.md  # ComponentType / Trait authoring
     workflows.md                   # Workflow authoring + CI governance
     cel.md                         # CEL syntax, context variables, helpers

@@ -1,17 +1,12 @@
 ---
 name: openchoreo-developer
 description: |
-  Use whenever the task is about working with an application on OpenChoreo: deploying, updating, debugging, explaining resources, writing app-facing YAML, or using `occ`. ALWAYS activate `openchoreo-core` alongside this skill — it holds the resource concepts, `occ` CLI, MCP tool catalog, and universal YAML schemas every developer task needs. Also activate `openchoreo-platform-engineer` when the task needs kubectl, platform resources (DataPlane, ComponentType, Trait, Workflow), or cluster-side debugging.
+  Use whenever the task is about working with an application on OpenChoreo: deploying, updating, debugging, explaining resources, writing app-facing YAML, or using `occ`. Also activate `openchoreo-platform-engineer` when the task needs kubectl, platform resources (DataPlane, ComponentType, Trait, Workflow), or cluster-side debugging.
 metadata:
   version: "1.0.0"
-  requires:
-    skills:
-      - openchoreo-core
 ---
 
 # OpenChoreo Developer Guide
-
-> **PREREQUISITE — activate `openchoreo-core` now.** Before answering any developer task, also load `openchoreo-core/SKILL.md` and consult its references (`concepts.md`, `cli.md`, `mcp.md`, `resource-schemas.md`) whenever you'd otherwise reach for resource concepts, `occ` commands, MCP tool details, or YAML schemas. Those foundations are not repeated in this skill — every developer flow assumes them.
 
 Help with application-level work on OpenChoreo. Keep this file lean, discover the current platform shape from `occ`, and read detailed references only when the task actually needs them.
 
@@ -50,7 +45,12 @@ Before inventing YAML, prefer live scaffolding and repository samples.
 
 ## Reference routing
 
-CLI commands, MCP tool catalogs, and workflow patterns (scaffold, build, deploy, debug, multi-service third-party app deployment) all live in `openchoreo-core/` — there are no per-skill CLI/MCP duplicates. Read `openchoreo-core/references/cli.md` and `openchoreo-core/references/mcp.md` for those.
+Foundational material:
+
+- `references/concepts.md` — resource hierarchy, Cell architecture, endpoint visibility, planes, API version
+- `references/cli.md` — `occ` install, login, context setup, full command surface, global flags, component lifecycle commands, all CLI gotchas
+- `references/mcp.md` — control-plane and observability MCP tool catalog, workflow patterns (scaffold, build, deploy, debug, third-party-app deployment), all MCP gotchas
+- `references/resource-schemas.md` — full YAML for Project, Component, Workload, Workload Descriptor, Environment, DeploymentPipeline, ReleaseBinding, SecretReference
 
 Developer-specific material:
 

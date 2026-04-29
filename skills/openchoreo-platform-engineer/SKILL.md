@@ -1,17 +1,12 @@
 ---
 name: openchoreo-platform-engineer
 description: |
-  Use whenever an OpenChoreo task needs a platform-level change or investigation: cluster setup, Helm upgrades, plane connectivity, platform resources, ComponentTypes, Traits, Workflows, gateways, secret stores, identity, GitOps, observability, or cluster-side debugging. ALWAYS activate `openchoreo-core` alongside this skill — it holds the resource concepts, `occ` CLI, MCP tool catalog, and universal YAML schemas every PE task needs. Prefer MCP tools, then occ, over kubectl. Also activate `openchoreo-developer` when the task involves deploying or debugging an application through `occ`.
+  Use whenever an OpenChoreo task needs a platform-level change or investigation: cluster setup, Helm upgrades, plane connectivity, platform resources, ComponentTypes, Traits, Workflows, gateways, secret stores, identity, GitOps, observability, or cluster-side debugging. Prefer MCP tools, then occ, over kubectl. Also activate `openchoreo-developer` when the task involves deploying or debugging an application through `occ`.
 metadata:
   version: "1.0.0"
-  requires:
-    skills:
-      - openchoreo-core
 ---
 
 # OpenChoreo Platform Engineer Guide
-
-> **PREREQUISITE — activate `openchoreo-core` now.** Before answering any PE task, also load `openchoreo-core/SKILL.md` and consult its references (`concepts.md`, `cli.md`, `mcp.md`, `resource-schemas.md`) whenever you'd otherwise reach for resource concepts, `occ` commands, MCP tool details, or YAML schemas. Those foundations are not repeated in this skill — every PE flow assumes them.
 
 Help with OpenChoreo platform-level work. Keep this file generic and pull specifics from the reference docs or the live cluster only when needed.
 
@@ -55,7 +50,12 @@ Avoid loading all references up front. Pull them in only when the task requires 
 
 ## Reference routing
 
-Foundational material lives in `openchoreo-core/references/` (concepts, CLI install/login, MCP tool catalog, universal YAML schemas). Read those first when the gap is foundational.
+Foundational material:
+
+- `references/concepts.md` — resource hierarchy, Cell architecture, endpoint visibility, planes, API version
+- `references/cli.md` — `occ` install, login, context setup, full command surface, global flags, all CLI gotchas
+- `references/mcp.md` — control-plane and observability MCP tool catalog, all MCP gotchas
+- `references/resource-schemas.md` — universal YAML shapes for Project, Component, Workload, Environment, DeploymentPipeline, ReleaseBinding, SecretReference
 
 PE-specific material in this skill:
 
@@ -67,8 +67,6 @@ PE-specific material in this skill:
 
 **Tooling:**
 - `references/troubleshooting.md` — failure isolation, health checks, log locations, common failure patterns
-
-`occ` install / login, command surface, MCP tool catalogue, and universal Project / Environment / DeploymentPipeline / ReleaseBinding YAML shapes all live in `openchoreo-core/`.
 
 For PE topics not bundled in these references — TLS / external CA, container registries, identity provider configuration, namespace management, multi-cluster connectivity, deployment topology, GitOps automations, observability adapter modules, API gateway modules, alert storage backend choice, IdP / bootstrap auth mappings, Backstage configuration, upgrades — consult the official PE guide at **https://openchoreo.dev/docs/platform-engineer-guide/**. The docs are the source of truth for those topics; do not rely on memory.
 

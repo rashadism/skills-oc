@@ -1,17 +1,12 @@
 ---
 name: openchoreo-install
 description: |
-  Use for the **initial install** of OpenChoreo on a Kubernetes cluster: installing prerequisites, registering planes (control, data, workflow, observability) for the first time, troubleshooting installation failures, or tearing down an installation. ALWAYS activate `openchoreo-core` alongside this skill — it holds the resource concepts, `occ` CLI, and YAML schemas the install steps reference. Do NOT use for post-install operations (Helm upgrades, day-2 plane changes, registering additional planes) — those belong to `openchoreo-platform-engineer` or the official PE guide.
+  Use for the **initial install** of OpenChoreo on a Kubernetes cluster: installing prerequisites, registering planes (control, data, workflow, observability) for the first time, troubleshooting installation failures, or tearing down an installation. Do NOT use for post-install operations (Helm upgrades, day-2 plane changes, registering additional planes) — those belong to `openchoreo-platform-engineer` or the official PE guide.
 metadata:
   version: "1.0.0"
-  requires:
-    skills:
-      - openchoreo-core
 ---
 
 # OpenChoreo Install Guide
-
-> **PREREQUISITE — activate `openchoreo-core` now.** Before running any install task, also load `openchoreo-core/SKILL.md` and consult its references (`concepts.md`, `cli.md`, `mcp.md`, `resource-schemas.md`) whenever you'd otherwise reach for resource concepts, `occ` commands, MCP tool details, or plane / Project / Environment YAML shapes. Those foundations are not repeated in this skill.
 
 Help with installing OpenChoreo on a Kubernetes cluster. This skill covers the full single-cluster installation path: prerequisites, control plane, data plane, workflow plane, and observability plane.
 
@@ -29,7 +24,14 @@ Pair with `openchoreo-platform-engineer` for post-install work: creating environ
 
 ## Reference routing
 
-Read only what the task needs:
+Foundational material:
+
+- `references/concepts.md` — resource hierarchy, Cell architecture, endpoint visibility, planes, API version
+- `references/cli.md` — `occ` install, login, context setup, full command surface, all CLI gotchas
+- `references/mcp.md` — control-plane and observability MCP tool catalog
+- `references/resource-schemas.md` — universal YAML shapes for Project, Component, Workload, Environment, DeploymentPipeline, ReleaseBinding, SecretReference
+
+Install-specific material — read only what the task needs:
 
 - `references/local-colima.md` — **start here for Colima users**; uses Colima's native k3s, no extra tools required — just `colima start` commands the user already knows
 - `references/local-k3d.md` — **alternative local path** (any Docker environment); uses k3d with fixed localhost ports and plain HTTP — better for guaranteed Chrome browser access
