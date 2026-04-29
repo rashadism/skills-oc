@@ -872,7 +872,7 @@ For apps with many services, batch workloads into YAML files and apply with `occ
 
 ## Debugging Deployments
 
-All debugging goes through `occ`. Developers typically don't have kubectl access.
+All debugging goes through MCP and `occ`. Cluster-level access is out of scope for this skill.
 
 ```bash
 # 1. Check component status and conditions

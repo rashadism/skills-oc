@@ -91,7 +91,7 @@ Use `--help` on the exact subcommand when scope handling matters. Context defaul
 
 ## `occ get` returns YAML
 
-Unlike kubectl, `occ` has no `--output` / `-o` flag. `occ <resource> get <name>` always returns the full YAML — spec + status. This is the primary way to inspect and debug resources.
+`occ` has no `--output` / `-o` flag. `occ <resource> get <name>` always returns the full YAML — spec + status. This is the primary way to inspect and debug resources.
 
 ```bash
 occ component get my-app             # spec, type ref, status conditions
@@ -143,7 +143,7 @@ occ apply -f <directory>    # Apply every .yaml/.yml file in the directory
 occ apply -f https://...    # Apply from a URL
 ```
 
-> **Gotcha — stdin doesn't work.** `occ apply -f -` fails with `path - does not exist`. Unlike kubectl, `occ` does not accept piped YAML. Always write YAML to a temp file first:
+> **Gotcha — stdin doesn't work.** `occ apply -f -` fails with `path - does not exist`. `occ` does not accept piped YAML. Always write YAML to a temp file first:
 >
 > ```bash
 > # Wrong — fails with: path - does not exist
@@ -263,7 +263,7 @@ occ workload list                    # what workloads exist?
 
 ## Gotchas
 
-**No `--output` / `-o` flag**: Unlike kubectl, `occ get` always returns YAML. There is no JSON or table output option.
+**No `--output` / `-o` flag**: `occ get` always returns YAML. There is no JSON or table output option.
 
 **`list` vs `get` scope**: `list` commands respect `--project`. `get` commands work with `--namespace` only — scoping for `get` flows through context defaults.
 

@@ -1,7 +1,7 @@
 ---
 name: openchoreo-developer
 description: |
-  Use whenever the task is about working with an application on OpenChoreo: deploying, updating, debugging, explaining resources, writing app-facing YAML, or using `occ`. Also activate `openchoreo-platform-engineer` when the task needs kubectl, platform resources (DataPlane, ComponentType, Trait, Workflow), or cluster-side debugging.
+  Use whenever the task is about working with an application on OpenChoreo: deploying, updating, debugging, explaining resources, writing app-facing YAML, or using `occ`. Also activate `openchoreo-platform-engineer` when the task needs platform resources (DataPlane, ComponentType, Trait, Workflow), cluster-side debugging, or any cluster-level access.
 metadata:
   version: "1.0.0"
 ---
@@ -22,8 +22,8 @@ Use this skill for developer-owned work:
 
 Activate `openchoreo-platform-engineer` at the same time when the task also includes any of these:
 
-- `kubectl` investigation
 - platform resources such as DataPlane, WorkflowPlane, Environment, DeploymentPipeline, ComponentType, Trait, Workflow, or ClusterWorkflow authoring
+- cluster-level access of any kind (controller logs, raw CRD inspection, Helm)
 - gateway, secret store, registry, identity, or other platform configuration
 - a likely PE-side failure rather than an app-level configuration problem
 
@@ -43,22 +43,36 @@ The current cluster output is more trustworthy than memory. Do not assume availa
 
 Before inventing YAML, prefer live scaffolding and repository samples.
 
+## Tool surface preference
+
+**MCP first, `occ` CLI as fallback.** Every recipe in `references/recipes/` shows MCP as the primary path with `occ` as fallback. Use `occ` only when:
+
+- the step has no MCP equivalent (`occ login`, `occ config context`, `occ component scaffold`);
+- you're applying a complete YAML file from disk (`occ apply -f`);
+- MCP fails or is unavailable;
+- the user explicitly asks for CLI.
+
+If a task can't be done with MCP or `occ` — controller logs, raw CRD inspection, Helm, anything cluster-level — activate `openchoreo-platform-engineer`. The developer skill operates entirely above the cluster boundary.
+
 ## Reference routing
 
 Foundational material:
 
 - `references/concepts.md` — resource hierarchy, Cell architecture, endpoint visibility, planes, API version
-- `references/cli.md` — `occ` install, login, context setup, full command surface, global flags, component lifecycle commands, all CLI gotchas
-- `references/mcp.md` — control-plane and observability MCP tool catalog, workflow patterns (scaffold, build, deploy, debug, third-party-app deployment), all MCP gotchas
 - `references/resource-schemas.md` — full YAML for Project, Component, Workload, Workload Descriptor, Environment, DeploymentPipeline, ReleaseBinding, SecretReference
 
-Developer-specific material:
+Recipes (one task per file, MCP first then `occ` fallback):
 
-- `references/deployment-guide.md` for BYOI, source builds, `workload.yaml`, dependencies, overrides, deployment flow, env-var patterns, and the long-form third-party-app deployment walkthrough
+- `references/recipes/deploy-prebuilt-image.md` — BYOI: deploy an existing image as a Component + Workload, including Project setup and private-registry variant
+- `references/recipes/build-from-source.md` — Build a container image from a Git repo via CI workflow, optional `workload.yaml` descriptor, private-Git and auto-build-on-push variants
+
+Long-form developer guide:
+
+- `references/deployment-guide.md` — BYOI, source builds, `workload.yaml`, dependencies, overrides, deployment flow, env-var patterns, third-party-app walkthrough (legacy combined doc; recipes will supersede sections of this over time)
+
+YAML templates referenced from recipes live in `assets/`. Copy and edit; do not apply unmodified.
 
 When the task crosses into PE-managed capabilities, activate `openchoreo-platform-engineer`.
-
-Before writing YAML from scratch, prefer `occ component scaffold` to generate a Component template from the live cluster.
 
 ## Discovery-first workflow
 
@@ -117,7 +131,7 @@ Trust deployed URLs and endpoint details from ReleaseBinding status instead of c
 
 Keep these because they are durable and routinely useful:
 
-- Default to MCP tools first, then `occ`; avoid `kubectl` — if the task genuinely needs it, that is a PE boundary or a mixed-skill task
+- Default to MCP tools first, `occ` as fallback. If a task can't be done with either, it is a PE boundary; activate `openchoreo-platform-engineer`
 - `occ <resource> get <name>` returns full YAML and is a primary debugging tool
 - Prefer scaffolding and samples over hand-written first drafts
 - Source-build Components use `spec.workflow`; `workload.yaml` belongs at the root of the selected `appPath`. **The build auto-generates the Workload as `{component}-workload`** — do NOT call `create_workload` for source-build components. To enrich the workload's endpoints / dependencies / env vars: preferred path is edit `workload.yaml` in the repo and rebuild; fallback is `update_workload` MCP / `occ apply -f` against the existing `{component}-workload` name (only when rebuilding isn't possible).

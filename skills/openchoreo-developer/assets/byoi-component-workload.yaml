@@ -1,0 +1,33 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: <COMPONENT_NAME>
+  namespace: default
+spec:
+  owner:
+    projectName: default
+  componentType:
+    kind: ClusterComponentType
+    name: deployment/service
+  autoDeploy: true
+---
+apiVersion: openchoreo.dev/v1alpha1
+kind: Workload
+metadata:
+  name: <COMPONENT_NAME>-workload
+  namespace: default
+spec:
+  owner:
+    projectName: default
+    componentName: <COMPONENT_NAME>
+  container:
+    image: <REGISTRY>/<REPO>:<TAG>
+    env:
+      - key: LOG_LEVEL
+        value: info
+  endpoints:
+    http:
+      type: HTTP
+      port: 9090
+      visibility:
+        - external
