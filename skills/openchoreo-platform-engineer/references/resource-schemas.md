@@ -2,7 +2,7 @@
 
 All resources use `apiVersion: openchoreo.dev/v1alpha1`.
 
-Prefer `occ component scaffold` or a matching sample from `samples/` before hand-writing YAML. Inspect the live cluster schema with the relevant MCP tool (`get_cluster_component_type_schema`, `get_workload_schema`, etc.) when unsure of a field shape.
+Prefer the live cluster schema (`get_cluster_component_type_schema`, `get_workload_schema`, `get_cluster_trait_schema`, `get_*_creation_schema` for ComponentType / Trait authoring) or a matching sample from `samples/` before hand-writing a spec. Resource creation goes through MCP `create_*` / `update_*` tools where MCP supports it; `kubectl apply -f` is the secondary path for resources without an MCP write surface (`SecretReference`, `AuthzRole` / bindings, `ObservabilityAlertsNotificationChannel`, plane resources) or for big YAML edits to ComponentType / Trait / Workflow specs.
 
 This file holds **universal** resource schemas — those any OpenChoreo workflow needs. Plane resource shapes (`DataPlane`, `WorkflowPlane`, `ObservabilityPlane`, `ObservabilityAlertsNotificationChannel`) are install-time concerns; consult the official PE guide at https://openchoreo.dev/docs/platform-engineer-guide/ for those.
 
@@ -64,7 +64,7 @@ spec:
 
 **Notes**:
 - Source builds use `spec.workflow`, not `spec.build`.
-- The `workflow.parameters` shape is determined by the workflow's `openAPIV3Schema`. The example above is for `dockerfile-builder`; other workflows have different shapes. Always inspect with `occ clusterworkflow get <name>` (or `occ workflow get <name>`) before authoring.
+- The `workflow.parameters` shape is determined by the workflow's `openAPIV3Schema`. The example above is for `dockerfile-builder`; other workflows have different shapes. Always inspect with `get_cluster_workflow_schema` (or `get_workflow_schema` for namespace-scoped) before authoring.
 - `componentType.name` is always `{workloadType}/{typeName}`.
 - `componentType.kind` and `workflow.kind` default to the cluster-scoped variant (`ClusterComponentType`, `ClusterWorkflow`). Set explicitly when using namespace-scoped types/workflows.
 - `repository.appPath` selects the service subdirectory and `workload.yaml`. `docker.context` and `docker.filePath` must still point at real repo-root-relative Docker build paths.
@@ -192,7 +192,7 @@ configurations:
 
 The descriptor and the Workload CR both use `name`/`key` plus `valueFrom.secretKeyRef`. The build workflow merges the built image into the descriptor to produce the Workload CR.
 
-> **The descriptor's `metadata.name` is read but ignored.** The build always names the generated Workload `{component}-workload`, regardless of what's in `workload.yaml`. So a Component named `api-service` produces a Workload named `api-service-workload`. Query the workload by that name (e.g. `occ workload get api-service-workload`), not by the component name.
+> **The descriptor's `metadata.name` is read but ignored.** The build always names the generated Workload `{component}-workload`, regardless of what's in `workload.yaml`. So a Component named `api-service` produces a Workload named `api-service-workload`. Query the workload by that name (e.g. `get_workload workload_name: api-service-workload`), not by the component name.
 
 ## Environment
 
@@ -262,7 +262,7 @@ spec:
 ```
 
 **Notes**:
-- `ReleaseBinding` is usually created by `occ component deploy`; hand-write it only when you need explicit overrides.
+- `ReleaseBinding` is usually created by `create_release_binding` (MCP); the spec body shown here is what flows into that call's parameters.
 - Current `state` values used by the CRD are `Active` and `Undeploy`.
 - Deployed endpoint URLs appear in `status.endpoints[].invokeURL`, `externalURLs`, and `internalURLs`.
 
@@ -290,7 +290,7 @@ spec:
 
 ## ComponentType (read-only for developers)
 
-Simplified shape for understanding what platform engineers configure. Developers pick types from `occ clustercomponenttype list`. For full authoring detail (schema, templates, patches, validation), see `openchoreo-platform-engineer/references/component-types-and-traits.md`.
+Simplified shape for understanding what platform engineers configure. Developers pick types from `list_cluster_component_types`. For full authoring detail (schema, templates, patches, validation), see `component-types-and-traits.md`.
 
 ```yaml
 apiVersion: openchoreo.dev/v1alpha1

@@ -30,7 +30,7 @@ create_component
 
 **Do not pass `workflow`** — that turns this into a source build.
 
-### 2. Inspect the Workload schema (optional but recommended)
+### 2. Inspect the Workload schema
 
 If you're not sure of the workload spec shape, fetch the schema first:
 

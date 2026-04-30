@@ -2,7 +2,13 @@
 
 This file is the authoring reference for **Workflows** and **ClusterWorkflows** — the platform-engineer-defined templates that power CI builds and standalone automation in OpenChoreo. Backed by [Argo Workflows](https://argo-workflows.readthedocs.io/).
 
-For CEL syntax used in `runTemplate` and `resources`, see `cel.md`. For ComponentType `allowedWorkflows` governance, see also `component-types-and-traits.md`.
+For CEL syntax used in `runTemplate` and `resources`, see `cel.md`. For ComponentType `allowedWorkflows` governance, see also `component-types-and-traits.md`. For the MCP catalog, see `mcp.md`.
+
+**Tool surface:**
+
+- **`Workflow` / `ClusterWorkflow` (control plane CRDs)** — MCP-first. `create_workflow` / `create_cluster_workflow` / `update_*` / `delete_*` all exist. The full `spec` body is passed to create / update (including `runTemplate` — the inline Argo Workflow). `update_*` is full-spec replacement; read first via `get_*`. `kubectl apply -f` is a fine fallback for big edits to `runTemplate` CEL where the diff is easier to manage as YAML.
+- **Argo `ClusterWorkflowTemplate`s (workflow plane)** — kubectl-only. These are upstream Argo CRDs, not OpenChoreo CRDs, and have no MCP path. Apply with `kubectl apply -f` against the workflow-plane cluster.
+- **`WorkflowRun` (control plane)** — created via `trigger_workflow_run` (component-bound) or `create_workflow_run` (standalone) MCP tools, or via Git webhook for auto-build, or hand-applied with `kubectl apply -f` for ad-hoc cases.
 
 Contents:
 1. Concepts — resources and the multi-plane architecture
@@ -14,6 +20,7 @@ Contents:
 7. CI workflow specifics — labels, vendor extensions, `allowedWorkflows` governance
 8. WorkflowRun validation
 9. TTL and cleanup
+10. Verification — MCP and `kubectl` flows
 
 ---
 
@@ -26,7 +33,7 @@ OpenChoreo runs every automation task — CI builds, infra provisioning, ETL, cu
 | Resource | Where it lives | Authored by | Purpose |
 |---|---|---|---|
 | **`Workflow` / `ClusterWorkflow`** | Control plane | Platform engineer | Template — schema + embedded Argo Workflow |
-| **`WorkflowRun`** | Control plane | Developer / webhook / `occ apply` | Single execution instance referencing a Workflow |
+| **`WorkflowRun`** | Control plane | Developer / webhook / MCP / `kubectl apply` | Single execution instance referencing a Workflow |
 | **Argo `ClusterWorkflowTemplate`** | Workflow plane | Platform engineer | One reusable step (clone, build, push, etc.) |
 | **Argo `Workflow`** | Workflow plane | Auto-generated | Rendered from `runTemplate` at run time — you never write this directly |
 
@@ -40,7 +47,7 @@ In single-cluster setups, both planes run in the same cluster.
 
 ### `WorkflowRun` is imperative
 
-> **Don't put `WorkflowRun` in GitOps repos.** It triggers an action rather than declaring desired state. Create runs through Git webhooks, the UI, or `occ apply`.
+> **Don't put `WorkflowRun` in GitOps repos.** It triggers an action rather than declaring desired state. Create runs through Git webhooks, the UI, MCP (`trigger_workflow_run` / `create_workflow_run`), or `kubectl apply`.
 
 > The `workflow` reference (`spec.workflow.kind` and `name`) is **immutable** on a `WorkflowRun` once created — you cannot change which workflow a run targets after it exists. Create a new run for a different workflow.
 
@@ -640,14 +647,51 @@ Deletes the WorkflowRun and all workflow-plane resources it created.
 
 ## 10. Verification
 
-```bash
-occ workflow list
-occ workflow get dockerfile-builder              # full YAML, status
+### MCP-first
 
-occ apply -f my-workflow.yaml
-occ workflowrun list                             # see runs
-occ workflowrun get <name>                       # status.conditions for failures
-occ workflowrun logs <name>                      # logs from each step
+```
+# Read what's already there
+list_cluster_workflows
+get_cluster_workflow <name>                       → full spec + status
+
+# Author a new one (apply the ClusterWorkflowTemplates first via kubectl, then create the Workflow CR)
+create_cluster_workflow                           → name + spec (parameters + runTemplate + externalRefs + resources)
+
+# Update — full-spec replacement
+get_cluster_workflow <name>                       → fetch current spec
+# modify locally
+update_cluster_workflow                           → name + the entire modified spec
+
+# Trigger and inspect runs
+trigger_workflow_run                              → component-bound build (build toolset)
+create_workflow_run                               → standalone run by workflow name with explicit parameters
+list_workflow_runs                                → run history
+get_workflow_run <name>                           → status.conditions, per-task phases
+query_workflow_logs                               → run logs (observer plane)
+```
+
+### `kubectl apply -f` fallback
+
+For large `runTemplate` CEL or many-line edits, applying YAML is often easier than the MCP full-replacement update:
+
+```bash
+kubectl get workflow                             # list
+kubectl get workflow dockerfile-builder -o yaml  # full YAML, status
+
+kubectl apply -f my-workflow.yaml
+kubectl get workflowrun                          # see runs
+kubectl get workflowrun <name> -o yaml           # status.conditions for failures
+```
+
+For runs and logs, prefer MCP (`list_workflow_runs`, `get_workflow_run`, `query_workflow_logs`) — the observer plane is the right surface for build logs.
+
+### kubectl for Argo CRDs
+
+`ClusterWorkflowTemplate` (Argo native) is applied with kubectl against the workflow-plane cluster — there is no MCP path:
+
+```bash
+kubectl --context <workflow-plane> apply -f cwt-checkout.yaml
+kubectl --context <workflow-plane> apply -f cwt-docker-build.yaml
 ```
 
 For workload generation (how the build output produces a `Workload` CR), the API-publishing OAuth setup, the auto-build webhook flow, external CI integration, and the full Argo Workflows reference, see https://openchoreo.dev/docs/platform-engineer-guide/workflows/.

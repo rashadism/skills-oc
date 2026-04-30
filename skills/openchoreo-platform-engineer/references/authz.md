@@ -4,6 +4,8 @@ This file covers the **authorization surface** that platform engineers operate o
 
 It does **not** cover identity provider setup, JWT claim mapping configuration, or bootstrap mappings — those are install / setup concerns. See https://openchoreo.dev/docs/platform-engineer-guide/authorization for those.
 
+> **MCP gap.** No MCP tools exist for `AuthzRole`, `ClusterAuthzRole`, `AuthzRoleBinding`, or `ClusterAuthzRoleBinding` — neither read nor write. All authz authoring goes through `kubectl apply -f`; inspect with `kubectl get <kind> <name> -o yaml`.
+
 Contents:
 1. RBAC model — subject, action, scope, effect
 2. Resource hierarchy and scope semantics
@@ -393,18 +395,18 @@ These are the actions defined in the system. Use exact strings in role `spec.act
 
 ```bash
 # Inspect roles
-occ clusterauthzrole list
-occ clusterauthzrole get <name>          # full YAML, status
-occ authzrole list --namespace <ns>
+kubectl get clusterauthzrole                     # list
+kubectl get clusterauthzrole <name> -o yaml      # full YAML, status
+kubectl get authzrole -n <ns>                    # namespace-scoped list
 
 # Inspect bindings
-occ clusterauthzrolebinding list
-occ clusterauthzrolebinding get <name>
-occ authzrolebinding list --namespace <ns>
+kubectl get clusterauthzrolebinding              # list
+kubectl get clusterauthzrolebinding <name> -o yaml
+kubectl get authzrolebinding -n <ns>
 
 # Apply a new role / binding
-occ apply -f my-role.yaml
-occ apply -f my-binding.yaml
+kubectl apply -f my-role.yaml
+kubectl apply -f my-binding.yaml
 ```
 
 For the full CRD field reference, see https://openchoreo.dev/docs/reference/api/platform/authzrole.md (and the related `clusterauthzrole`, `authzrolebinding`, `clusterauthzrolebinding` API docs).

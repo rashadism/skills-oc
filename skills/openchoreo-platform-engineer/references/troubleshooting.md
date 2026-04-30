@@ -14,20 +14,38 @@
 
 Start from the plane where the failure manifests, then work outward.
 
-### Health check commands
+> **Tool order for diagnostics.** For OpenChoreo CRD inspection (Component, Workload, ReleaseBinding, Environment, plane status), use **MCP first** — `get_component`, `get_release_binding`, `get_dataplane`, etc. all return spec + `status.conditions[]`. For per-binding data-plane drill-down, use `get_resource_events` and `get_resource_logs`. Drop to **kubectl** only when MCP can't reach what you need: controller / cluster-gateway / cluster-agent pod logs, raw cluster-wide CRD inspection, fluent-bit / OpenSearch logs.
+
+### Health check — MCP path (read OpenChoreo CRD status)
+
+```
+get_component <name>                        → status.conditions, dependent resources
+get_workload <name>                         → container, endpoints, status
+get_release_binding <name>                  → per-environment readiness, deployed URLs
+get_dataplane <name>                         → plane connectivity, gateway config, agent state
+get_workflowplane <name>                    → workflow plane state
+get_observability_plane <name>              → observer endpoint, agent state
+list_release_bindings <component>           → see all envs the component is deployed to
+
+get_resource_events                          → K8s events on Deployment / Pod under a binding
+                                                (image pull errors, scheduling failures, OOM)
+get_resource_logs                            → raw container logs for a specific pod under a binding
+                                                (crashloops, startup failures)
+
+query_component_logs                         → observer-store runtime logs (filter, search, time range)
+query_workflow_logs                          → build / workflow run logs
+```
+
+### Health check — kubectl path (cluster pods, controllers, raw CRDs)
 
 ```bash
-# Plane pod status
+# Plane pod status (no MCP equivalent)
 kubectl get pods -n openchoreo-control-plane
 kubectl get pods -n openchoreo-data-plane
 kubectl get pods -n openchoreo-workflow-plane
 kubectl get pods -n openchoreo-observability-plane
 
-# Resource conditions (primary debugging tool)
-occ <resource> get <name>
-# Look at status.conditions for type, status, reason, message
-
-# Cluster-wide resource view
+# Cluster-wide raw CRD view (use when MCP filters don't fit, or for non-OpenChoreo CRDs)
 kubectl get <crd> -A
 ```
 
@@ -85,15 +103,20 @@ Common causes:
 
 ### Workloads not deploying
 
-```bash
-# Check the resource chain
-occ component get <name>
-occ releasebinding get <binding>
+```
+# Check the resource chain — MCP
+get_component <name>                            → status.conditions
+get_release_binding <binding>                   → per-env readiness, condition messages
+get_resource_events                             → K8s events on the Deployment / Pod
+                                                  (kind: Deployment / Pod, group: apps / "")
+get_resource_logs                               → raw container logs for a crashing pod
+```
 
-# Check data plane agent
+```bash
+# Check data plane agent (kubectl — no MCP path for plane pod logs)
 kubectl logs deployment/cluster-agent -n openchoreo-data-plane --tail=50
 
-# Check the actual workload on the data plane
+# Inspect the rendered K8s resources directly when needed
 kubectl get deployments -n <cell-namespace>
 kubectl describe deployment <name> -n <cell-namespace>
 kubectl get events -n <cell-namespace> --sort-by='.lastTimestamp'
@@ -108,11 +131,13 @@ Common causes:
 
 ### Endpoints not accessible
 
-```bash
-# Check release binding status for URLs
-occ releasebinding get <binding>
+```
+# Check release binding status for URLs (MCP)
+get_release_binding <binding>                   → status.endpoints[], invokeURL, externalURLs
+```
 
-# Check gateway resources
+```bash
+# Inspect Gateway API resources (kubectl — Gateway API is upstream K8s, not OpenChoreo)
 kubectl get gateway -A
 kubectl get httproute -A
 kubectl describe httproute <name> -n <ns>
@@ -128,16 +153,18 @@ Common causes:
 
 ### Builds not starting
 
-```bash
-# Check workflow plane agent connectivity
-kubectl logs deployment/cluster-agent -n openchoreo-workflow-plane --tail=50
+```
+# Check WorkflowRun status (MCP)
+list_workflow_runs                              → recent runs for namespace / project / component
+get_workflow_run <name>                         → status.conditions, per-task phases
+get_workflowplane <name>                        → workflow plane registration / agent state
+```
 
-# Check Argo Workflows controller
+```bash
+# Workflow plane internals (kubectl — no MCP path for plane pod logs / Argo CR)
+kubectl logs deployment/cluster-agent -n openchoreo-workflow-plane --tail=50
 kubectl get pods -n openchoreo-workflow-plane
 kubectl logs deployment/argo-workflows-workflow-controller -n openchoreo-workflow-plane --tail=50
-
-# Check WorkflowRun status
-occ component workflowrun list <component>
 kubectl get workflows.argoproj.io -n openchoreo-workflow-plane
 ```
 
@@ -149,15 +176,19 @@ Common causes:
 
 ### Build failures
 
-```bash
-# Follow build logs
-occ component workflow logs <component> -f
+```
+# Follow build logs (MCP)
+query_workflow_logs                             → namespace + workflow_run_name + start_time/end_time
+list_workflow_runs                              → find the run name first
+get_workflow_run <name>                         → status.conditions + per-task phases
+```
 
-# Check Argo workflow pods
+```bash
+# Argo workflow pods (kubectl — these are upstream Argo CRs)
 kubectl get pods -n openchoreo-workflow-plane -l workflows.argoproj.io/workflow
 kubectl logs <workflow-pod> -n openchoreo-workflow-plane -c main
 
-# Check specific step
+# Specific step
 kubectl logs <workflow-pod> -n openchoreo-workflow-plane -c <step-name>
 ```
 

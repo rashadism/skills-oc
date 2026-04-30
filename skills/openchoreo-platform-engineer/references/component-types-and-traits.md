@@ -2,7 +2,9 @@
 
 This file is the authoring reference for **ComponentTypes**, **ClusterComponentTypes**, **Traits**, and **ClusterTraits** — the resources platform engineers create so developers have deployment templates and composable capabilities.
 
-For the CEL expressions used throughout, see `cel.md`. For Workflow authoring (build templates), see `workflows.md`.
+For the CEL expressions used throughout, see `cel.md`. For Workflow authoring (build templates), see `workflows.md`. For the MCP catalog, see `mcp.md`.
+
+**Tool surface for these resources:** MCP-first. `create_component_type` / `create_cluster_component_type` / `create_trait` / `create_cluster_trait` (and their `update_*` / `delete_*` counterparts) all exist. They take a full `spec` body — discover the spec shape via `get_component_type_creation_schema` / `get_trait_creation_schema`. `update_*` is **full-spec replacement**: read the current spec via `get_*` first, modify locally, send the whole spec back. For one-line CEL or template tweaks, `kubectl apply -f` against an edited YAML is often easier; both paths are equivalent.
 
 Contents:
 1. Concepts — what each resource does, scope rules
@@ -13,6 +15,7 @@ Contents:
 6. Validation rules
 7. How developers consume these resources
 8. Common patterns
+9. Verification — MCP and `kubectl` flows
 
 ---
 
@@ -30,6 +33,7 @@ Contents:
 - A `ClusterComponentType` may only reference `ClusterTrait` in `allowedTraits`.
 - A `ComponentType` (namespaced) may reference both `Trait` and `ClusterTrait`.
 - `ClusterComponentType` / `ClusterTrait` manifests **must not** include `metadata.namespace` — cluster-scoped resources reject it.
+- **`ClusterTrait` does NOT support `spec.validations`.** Only namespace-scoped `Trait` does. The cluster-scoped variant rejects validations at create / update time.
 
 ### Workload types
 
@@ -1004,21 +1008,50 @@ metadata:
 
 ---
 
-## 8. Verification
+## 9. Verification
 
-```bash
-# Apply the type/trait
-occ apply -f web-service.yaml
+### MCP-first flow
+
+```
+# Discover the creation schema, then create the type
+get_cluster_component_type_creation_schema       → schema for the spec body
+create_cluster_component_type                    → name + spec (display_name / description optional)
 
 # Confirm it's discoverable
-occ clustercomponenttype list
-occ clustercomponenttype get deployment/web-service       # full YAML, status.conditions
-occ clustertrait get persistent-volume
+list_cluster_component_types                     → see the new type appear
+get_cluster_component_type <name>                → full resource (templates, allowed workflows, validation rules)
 
-# Test by creating a Component that uses it
-occ apply -f test-component.yaml
-occ component get test-component                          # check status.conditions for validation failures
+# For traits, same shape
+get_trait_creation_schema
+create_cluster_trait                              → name + spec
+get_cluster_trait <name>
+
+# Test by creating a Component that uses it (paired with the developer skill, or direct via MCP)
+create_component                                  → with this componentType
+get_component <name>                              → check status.conditions for validation failures
 ```
+
+For an existing type, the update path is:
+
+```
+get_cluster_component_type <name>      → fetch the current full spec
+# modify locally
+update_cluster_component_type          → name + the entire modified spec (full-replacement; missing fields are deleted)
+```
+
+### `kubectl apply -f` fallback
+
+For large CEL templates or many-line edits, `kubectl apply -f` against a YAML file often leaves a cleaner diff than the MCP full-replacement update:
+
+```bash
+kubectl apply -f web-service.yaml
+kubectl get clustercomponenttype                              # list
+kubectl get clustercomponenttype deployment/web-service -o yaml
+kubectl apply -f test-component.yaml
+kubectl get component test-component -o yaml
+```
+
+For comparable inspection without leaving MCP, the equivalents are `list_cluster_component_types`, `get_cluster_component_type <name>`, `get_component <name>`. Both paths produce the same end state.
 
 If a validation fails, `status.conditions` carries the rule index and message in the form documented in §5.
 
