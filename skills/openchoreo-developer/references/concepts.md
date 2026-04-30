@@ -72,13 +72,16 @@ The build's `generate-workload` step reads `workload.yaml` and emits a Workload 
 For the full descriptor schema and source-build flow, see `openchoreo-developer/references/deployment-guide.md`.
 
 ### Endpoint Visibility
-Controls who can reach your service:
+Controls who can reach your service. Declared as a *list* on each target endpoint (`endpoints.<name>.visibility: [...]`); every endpoint implicitly has `project`:
+
 - `project`: Same project and environment (implicit for all endpoints, no gateway needed)
 - `namespace`: All projects in same namespace and environment (needs westbound gateway)
 - `internal`: All namespaces in deployment (needs westbound gateway)
 - `external`: Public internet (needs northbound gateway, usually configured)
 
 The northbound gateway for external traffic is typically set up. The westbound gateway for internal/namespace traffic may not be. If you need internal visibility and get rendering errors, it's likely because the westbound gateway isn't configured. Escalate to platform engineering.
+
+> **Dependency entries are different.** When a Component declares a *dependency* on another component's endpoint (`dependencies.endpoints[*].visibility`), only `project` and `namespace` are valid — the API rejects `internal` and `external` there. Cross-namespace dependencies are not supported via this mechanism. See `recipes/connect-components.md`.
 
 ### ComponentType
 Platform-engineer-defined template that controls how a component deploys. Developers pick from available types and fill in the schema. View available types with `list_cluster_component_types` and inspect one with `get_cluster_component_type` / `get_cluster_component_type_schema`.

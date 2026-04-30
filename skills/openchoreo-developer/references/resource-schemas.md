@@ -137,7 +137,9 @@ spec:
 
 `endpoints` is a **map** keyed by endpoint name (`api`, `metrics`, …). Allowed `type` values: `HTTP`, `GraphQL`, `Websocket`, `gRPC`, `TCP`, `UDP`. Every endpoint implicitly has `project` visibility — the `visibility` array adds `namespace`, `internal`, or `external`.
 
-`dependencies.endpoints` is a **list** of connections to other components' endpoints. Field names: `component`, `name` (target endpoint name), `visibility`, `envBindings`. Optional `project` defaults to the same project.
+`dependencies.endpoints` is a **list** of connections to other components' endpoints. Field names: `component`, `name` (target endpoint name — *not* `endpoint`), `visibility`, `envBindings`. Optional `project` defaults to the same project.
+
+> **Dependency `visibility` is constrained to `project` or `namespace` only.** The API rejects `internal` and `external` on `dependencies.endpoints[*].visibility`. Cross-namespace dependencies are not supported via this mechanism. The four-level enum (`project` / `namespace` / `internal` / `external`) applies only to the *target endpoint* declaration's visibility list.
 
 For reverse proxies, prefer `host` and `port` bindings unless you explicitly want the endpoint `basePath` included in the upstream URL.
 

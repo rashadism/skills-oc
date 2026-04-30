@@ -274,7 +274,7 @@ configurations:
 ```
 
 ### Endpoint Types
-HTTP, REST, gRPC, GraphQL, Websocket, TCP, UDP
+`HTTP`, `GraphQL`, `Websocket`, `gRPC`, `TCP`, `UDP` — exact casing matters, the API server is case-sensitive (e.g. `Websocket` not `WebSocket`, `gRPC` not `GRPC`).
 
 ### Visibility Values
 - `project` - implicit for all endpoints, no extra gateway needed
@@ -282,8 +282,18 @@ HTTP, REST, gRPC, GraphQL, Websocket, TCP, UDP
 - `internal` - needs westbound gateway
 - `external` - needs northbound gateway (usually configured)
 
+> The four levels above apply to *target endpoint* declarations. **Dependency entries (`dependencies.endpoints[*].visibility`) accept only `project` or `namespace`** — the API rejects `internal` / `external` there. Cross-namespace dependencies are not supported via this mechanism. See `recipes/connect-components.md`.
+
 ### Dependency EnvBindings
 The platform resolves the target service address and injects env vars. Use dependencies instead of hardcoding URLs. At least one envBinding field should be set.
+
+`address` format depends on the target endpoint's `type`:
+
+- `HTTP` / `GraphQL`: `http://host:port/basePath`
+- `Websocket`: `ws://host:port/basePath` *(in-cluster scheme; for browser-facing access use the `wss://` external URL from `get_release_binding` → `endpoints[*].externalURLs`, not the injected `address`)*
+- `gRPC` / `TCP` / `UDP`: `host:port` (no scheme, no path)
+
+If the target's `basePath` is empty, `address` ends at `host:port` with no trailing slash.
 
 ## Using schema discovery
 
@@ -597,6 +607,14 @@ On OpenChoreo, the `BACKEND_URL` env var is injected by the connection. Locally,
 ### Frontend -> Backend Connectivity
 
 Frontends are trickier because they run in the browser, not on the server. The browser can't read server-side env vars at runtime. Common patterns:
+
+> **Read the frontend source before picking a pattern.** Look at `package.json`, `index.html`, and a couple of API call sites in `src/`:
+>
+> - **Single-page app (React / Vue / Angular bundle served by nginx, Static-site export):** the browser executes the JS and makes the API calls itself. Backend URLs **must be public addresses** — `https://...` and `wss://...`. Use the mounted runtime `config.json` approach (see "SPA runtime config pattern" earlier in this file under *File-based configuration*) so the same image works in dev and prod with different backend URLs. Don't inject in-cluster service addresses; the browser can't resolve them.
+> - **Server-side rendered / templated app (Next.js SSR mode, Rails, Django, Express with server-rendered views):** the **server** makes the API calls. In-cluster addresses work fine, and an nginx reverse proxy (Pattern 2) is reasonable for path-based routing.
+> - **Hybrid (Next.js with both SSR routes and client-side fetches):** the SSR server can use in-cluster addresses; the client-side fetches need public ones. Mount a runtime config and read it on both sides.
+>
+> Pick the wrong pattern and you'll either ship `http://service.cluster.local` to a browser (mixed-content blocked) or send public HTTPS traffic through your own pod for no reason.
 
 **Pattern 1: Build-time env vars (React, Vue, Angular)**
 

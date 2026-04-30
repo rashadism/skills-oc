@@ -127,6 +127,8 @@ Visibility levels (broader → narrower):
 
 Visibility is a list — an endpoint can expose itself at multiple levels at once (e.g. `[namespace, external]`).
 
+> **Non-HTTP endpoints are first-class.** Set `type: Websocket`, `gRPC`, `TCP`, `UDP`, or `GraphQL` directly. The platform's gateway handles Websocket protocol upgrade and gRPC HTTP/2 routing natively — **don't add a custom reverse-proxy or protocol-upgrade configuration** of any kind (nginx upgrade headers, Caddy / Envoy / Traefik route rules, sidecars) for these protocols. Reference samples: `samples/from-image/echo-websocket-service/`, `samples/from-image/grpc-service/` in the OpenChoreo repo. For multi-protocol patterns (e.g. a Websocket endpoint alongside an HTTP endpoint on the same component), define each as its own entry in the `endpoints:` map.
+
 ### Environment variables
 
 ```yaml

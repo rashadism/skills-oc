@@ -11,15 +11,21 @@ Wire one Component to another's endpoint so OpenChoreo injects the resolved serv
 
 ## Prerequisites
 
-1. Both Components exist and the **target's endpoint visibility is broad enough** for the consumer:
+> **The dependency entry's `visibility` is constrained to `project` or `namespace` only.** The API rejects `internal` and `external` on `dependencies.endpoints[*].visibility` — those two levels exist for *target endpoint declarations* (ingress) and for non-dependency consumers, not for service-to-service dependency wiring. **Cross-namespace dependencies are not supported** via this mechanism; if you need one, escalate to `openchoreo-platform-engineer` (a gateway / network-policy approach).
 
-| Consumer asks for | Target endpoint must declare at least |
-|---|---|
-| same project | `project` (implicit) |
-| different project, same namespace | `namespace` |
-| different namespace | `internal` |
+> **Default `visibility: project`.** Same-project, same-environment is the baseline — that's what a Project's Cell is for, and it does not require any gateway routing. Pick `namespace` only when the consumer and target are actually in different projects of the same namespace. Confirm both components' projects via `get_component` before deciding.
 
-2. Visibility is a *list*, so a target endpoint can have e.g. `[namespace, external]` and serve both same-project and cross-project consumers.
+1. Both Components exist and the **target's endpoint visibility is broad enough** for the consumer. Pick the dependency entry's `visibility` field from this table:
+
+| Consumer / target relationship | Set `visibility:` to | Target endpoint must declare at least |
+|---|---|---|
+| same project + same environment | `project` (default) | `project` (implicit on every endpoint) |
+| different project, same namespace | `namespace` | `namespace` |
+| different namespace | _not supported_ | — |
+
+2. Visibility on the target endpoint is a *list*, so a target can have e.g. `[namespace, external]` and serve both same-project and cross-project consumers. The four target-side visibility levels are `project`, `namespace`, `internal`, `external`. The two dependency-side options are a strict subset (`project`, `namespace`).
+
+3. **The dependency entry uses `name:` (the target endpoint name on the dependency component), not `endpoint:`.** The pre-v1.0.0 `endpoint:` field is gone. Discover the target's endpoint names via `get_workload` first.
 
 To inspect a target's endpoint visibility:
 
@@ -132,6 +138,43 @@ dependencies:
         basePath: ANALYTICS_API_BASE_PATH
 ```
 
+### SPA frontend with HTTP + Websocket backends (same project)
+
+A common multi-backend pattern: a browser-side SPA in the same project as a REST backend and a Websocket backend. The frontend declares both as same-project dependencies; the platform handles Websocket protocol upgrade natively when the target endpoint `type` is `Websocket`. **Don't** add a custom reverse-proxy or protocol-upgrade configuration (nginx, Caddy, Envoy sidecar, etc.) — set the target's endpoint type and let OpenChoreo route it.
+
+Target backends' workload spec (excerpt):
+
+```yaml
+endpoints:
+  api:
+    type: HTTP
+    port: 8080
+    visibility: [project, external]   # external so the browser can reach it
+  ws:
+    type: Websocket
+    port: 8081
+    visibility: [project, external]
+```
+
+Frontend's workload spec (excerpt):
+
+```yaml
+dependencies:
+  endpoints:
+    - component: document-svc
+      name: api
+      visibility: project              # default — same-project link
+      envBindings:
+        address: DOCUMENT_API_URL
+    - component: collab-svc
+      name: ws
+      visibility: project
+      envBindings:
+        address: COLLAB_WS_URL
+```
+
+For a browser-side SPA, the runtime URLs the browser actually fetches must be the **external** addresses from `get_release_binding` → `endpoints[*].externalURLs`, served via a mounted `config.json` (use `https://` and `wss://` schemes). The `dependencies.endpoints[]` declaration is still required — it makes the connection visible in the cell topology and tells the platform which components talk to which. See `recipes/configure-workload.md` for the file-mount pattern. Reference samples: `samples/from-image/echo-websocket-service/` and the platform docs for protocol-upgrade behaviour.
+
 ## envBindings keys
 
 Each binding takes one or more of:
@@ -145,8 +188,11 @@ Each binding takes one or more of:
 
 The format of `address` depends on the endpoint type:
 
-- HTTP / WebSocket: `scheme://host:port/basePath`
-- gRPC / TCP / UDP: `host:port`
+- `HTTP` / `GraphQL`: `http://host:port/basePath`
+- `Websocket`: `ws://host:port/basePath` (in-cluster scheme; for browser-facing access, use the external `wss://` URL from `get_release_binding` → `endpoints[*].externalURLs`, not this injected value)
+- `gRPC` / `TCP` / `UDP`: `host:port` (no scheme, no path)
+
+If the target endpoint has no `basePath`, `address` ends at `host:port` with no trailing slash.
 
 The right side of each `envBindings` entry is the env var name in the consumer.
 
@@ -155,8 +201,9 @@ The right side of each `envBindings` entry is the env var name in the consumer.
 - **Dependencies live at `spec.dependencies.endpoints[]`, not flat `spec.dependencies[]` or `spec.connections[]`.** The pre-v1.0.0 flat shape is gone. Each entry uses `name` for the target endpoint name — not `endpoint`.
 - **`update_workload` sends the full spec** — read first, append the dependency, send back. See `recipes/configure-workload.md` for the same gotcha.
 - **Visibility mismatch is silent until reconcile.** `update_workload` accepts a dependency whose target visibility is too narrow, but the ReleaseBinding fails to bind. Check `status.conditions` on the ReleaseBinding for the actual error.
-- **Cross-project dependencies require both `visibility: namespace` (or broader) and `project: <name>`.** Missing `project` defaults to the same project — the binding fails with "endpoint not found" because the controller looks in the wrong project.
-- **Consumer's visibility request can't exceed the target's declaration.** Asking for `internal` against a target that only declares `[namespace]` fails. Either lower the consumer's `visibility` or have the target add `internal` to its endpoint visibility.
+- **Cross-project dependencies require both `visibility: namespace` and `project: <target-project>`.** Missing `project` defaults to the same project — the binding fails with "endpoint not found" because the controller looks in the wrong project.
+- **Dependency entry's `visibility` is `project` or `namespace` only.** The API rejects `internal` and `external` here. Cross-namespace dependencies are not supported via this mechanism — escalate to PE for a gateway-based approach.
+- **Consumer's visibility request must be ≤ what the target declares.** Asking for `namespace` against a target whose endpoint visibility is `[project]` fails reconciliation. Either lower the consumer's visibility (only `project` works for a project-only target) or have the target add `namespace` to its endpoint visibility list.
 - **Max 50 endpoint dependencies per Workload.** A consumer pulling from more than 50 components is a design smell — split it.
 - **Connection refused after deploy?** Confirm the target's endpoint visibility list includes the level the consumer is asking for. Most "it deployed but can't connect" issues trace to this.
 - **The injected `address` already includes the scheme (HTTP/WS).** Don't prepend `http://` in the consumer's code when using `address`. If you need just the host, use `envBindings.host` instead.
