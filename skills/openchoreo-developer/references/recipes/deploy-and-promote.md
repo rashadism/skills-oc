@@ -2,8 +2,6 @@
 
 Deploy a Component release to its first environment and promote it through the pipeline (e.g. `development → staging → production`). Also: rollback to an older release, undeploy, and redeploy an undeployed binding.
 
-> **Tool surface preference: MCP first, `occ` CLI as fallback.** Same as every recipe in this skill.
-
 ## When to use
 
 - A new Component release is ready and needs to reach the first environment
@@ -26,16 +24,18 @@ Deployment + Service + HTTPRoute (in the data plane)
 
 `auto_deploy: true` on the Component creates the **first environment's** ReleaseBinding automatically when a new ComponentRelease appears. Subsequent environments are manual.
 
-To list releases:
+To list releases for a component:
 
-```bash
-occ componentrelease list --namespace default --project default --component my-service
+```
+list_component_releases
+  namespace_name: default
+  component_name: my-service
 ```
 
 To list current bindings:
 
 ```
-mcp__openchoreo-cp__list_release_bindings
+list_release_bindings
   namespace_name: default
   component_name: my-service
 ```
@@ -44,35 +44,21 @@ mcp__openchoreo-cp__list_release_bindings
 
 If `auto_deploy: true` was set on `create_component`, the first environment's ReleaseBinding is created automatically when the ComponentRelease lands. Skip ahead to verification.
 
-If `auto_deploy: false` (or you want explicit control), create the binding manually.
-
-### MCP
+If `auto_deploy: false` (or you want explicit control), create the binding manually:
 
 ```
-mcp__openchoreo-cp__create_release_binding
+create_release_binding
   namespace_name: default
   project_name: default
   component_name: my-service
   environment: development
-  release_name: my-service-5d7f658d9c     # from `occ componentrelease list`
-```
-
-### CLI
-
-```bash
-occ component deploy my-service --namespace default --project default
-```
-
-For a specific release (instead of latest):
-
-```bash
-occ component deploy my-service --release my-service-5d7f658d9c
+  release_name: my-service-5d7f658d9c
 ```
 
 ### Verify
 
 ```
-mcp__openchoreo-cp__get_release_binding
+get_release_binding
   namespace_name: default
   binding_name: my-service-development
 ```
@@ -83,10 +69,8 @@ mcp__openchoreo-cp__get_release_binding
 
 Promotion is "create a new ReleaseBinding for the next environment, pointing at the same release." Pipelines define the allowed source → target paths; the platform validates against them.
 
-### MCP
-
 ```
-mcp__openchoreo-cp__create_release_binding
+create_release_binding
   namespace_name: default
   project_name: default
   component_name: my-service
@@ -96,23 +80,10 @@ mcp__openchoreo-cp__create_release_binding
 
 For per-environment overrides at promotion time, see `recipes/override-per-environment.md` — pass `component_type_environment_configs`, `trait_environment_configs`, and `workload_overrides` on the same call.
 
-### CLI
-
-```bash
-occ component deploy my-service --to staging
-occ component deploy my-service --to production
-```
-
-`--to` resolves the target environment from the Component's deployment pipeline. To promote a *specific* release rather than the latest:
-
-```bash
-occ component deploy my-service --to staging --release my-service-5d7f658d9c
-```
-
 ### Verify
 
 ```
-mcp__openchoreo-cp__list_release_bindings
+list_release_bindings
   namespace_name: default
   component_name: my-service
 ```
@@ -125,25 +96,21 @@ Rollback = point an existing ReleaseBinding at an older ComponentRelease. The re
 
 ### Find the older release
 
-```bash
-occ componentrelease list --namespace default --project default --component my-service
+```
+list_component_releases
+  namespace_name: default
+  component_name: my-service
 ```
 
-The output lists all releases for the component, oldest to newest.
+The output lists all releases for the component. Pick the older release name to roll back to.
 
-### MCP
+### Update the binding
 
 ```
-mcp__openchoreo-cp__update_release_binding
+update_release_binding
   namespace_name: default
   binding_name: my-service-production
   release_name: my-service-a1b2c3d4e5     # the older release to roll back to
-```
-
-### CLI
-
-```bash
-occ component deploy my-service --to production --release my-service-a1b2c3d4e5
 ```
 
 ### Verify
@@ -151,7 +118,7 @@ occ component deploy my-service --to production --release my-service-a1b2c3d4e5
 `status.conditions[]` flips through `Synced: False` while the new release rolls out, then back to `Synced: True`. Watch logs to confirm the older code is running:
 
 ```
-mcp__openchoreo-obs__query_component_logs
+query_component_logs
   namespace: default
   component: my-service
   environment: production
@@ -163,10 +130,8 @@ mcp__openchoreo-obs__query_component_logs
 
 Take a binding offline without deleting it. Config (overrides, release pointer) stays intact for a future redeploy.
 
-### MCP
-
 ```
-mcp__openchoreo-cp__update_release_binding_state
+update_release_binding_state
   namespace_name: default
   binding_name: my-service-staging
   release_state: Undeploy
@@ -179,7 +144,7 @@ The Deployment, Service, and HTTPRoute in the data plane disappear; the ReleaseB
 ## Variant — redeploy an undeployed binding
 
 ```
-mcp__openchoreo-cp__update_release_binding_state
+update_release_binding_state
   namespace_name: default
   binding_name: my-service-staging
   release_state: Active
@@ -194,9 +159,9 @@ The Deployment / Service / HTTPRoute come back with the binding's existing relea
 - **`create_release_binding` fails if a binding already exists for that environment.** To change the release in an existing binding, use `update_release_binding release_name: <new>`. The MCP tool description says this explicitly.
 - **Pipelines gate promotion paths.** If the pipeline only allows `dev → staging → prod`, you cannot skip from `dev → prod` directly. Override at the PE side or change the pipeline.
 - **Promoted bindings start without overrides.** Each environment's ReleaseBinding is independent — promotion creates a fresh binding for the new env. Re-apply per-environment overrides explicitly. See `recipes/override-per-environment.md`.
-- **`Undeploy` does not delete the binding.** It just removes the data-plane resources. The ReleaseBinding resource is still there with all config intact. To fully delete, use `delete_release_binding` (MCP) or `occ releasebinding delete`.
+- **`Undeploy` does not delete the binding.** It just removes the data-plane resources. The ReleaseBinding resource itself stays with all config intact, ready for a future redeploy. There is no MCP `delete_release_binding` tool — hard-delete needs `openchoreo-platform-engineer`.
 - **Rollback only changes `release_name`** — env-specific overrides on the binding survive. If the older release expected different env vars, you may need to also update `workload_overrides` on the same call.
-- **`occ component deploy --to <env>` infers the latest release.** To roll back via CLI, always pass `--release <name>` explicitly, otherwise you'll redeploy the latest (which is what you're rolling back from).
+- **`create_release_binding` requires all five of `namespace_name`, `project_name`, `component_name`, `environment`, `release_name`.** `release_name` is not optional. If `auto_deploy: true` and the Workload just changed, a fresh ComponentRelease is created automatically — find its name via `list_component_releases`.
 
 ## Related recipes
 

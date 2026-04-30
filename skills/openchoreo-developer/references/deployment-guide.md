@@ -10,7 +10,7 @@ Use this index to jump to the section you need — do not read the whole file.
 | Deploy from source / Git | [Building from Source](#building-from-source) |
 | Understand how the CI build produces a Workload | [How the CI Pipeline Works](#how-the-ci-pipeline-works) |
 | Write or fix `workload.yaml` (endpoints, dependencies) | [Workload Descriptor](#workload-descriptor-workloadyaml) |
-| Scaffold Component YAML from the live cluster | [Using occ component scaffold](#using-occ-component-scaffold) |
+| Author Component / Workload specs from the live cluster | [Using schema discovery](#using-schema-discovery) |
 | Deploy to an environment or promote | [Deploying and Promoting](#deploying-and-promoting) |
 | Override config per environment | [ReleaseBinding with Overrides](#releasebinding-with-overrides) |
 | Multi-service app layout | [Multi-Service Applications](#multi-service-applications) |
@@ -23,57 +23,43 @@ Use this index to jump to the section you need — do not read the whole file.
 
 ## Pre-built Image (BYOI) - Simplest Path
 
-For apps with existing container images, you need Component + Workload resources.
+For apps with existing container images, you need Component + Workload resources. Both are created via MCP — see `recipes/deploy-prebuilt-image.md` for the canonical, parameter-by-parameter walkthrough. The shapes below show the underlying spec the MCP calls construct.
 
-### Minimal Example
+### Minimal example — Component spec (passed into `create_component`)
 
 ```yaml
----
-apiVersion: openchoreo.dev/v1alpha1
-kind: Component
-metadata:
-  name: my-app
-  namespace: default
-spec:
-  autoDeploy: true
-  componentType:
-    kind: ComponentType        # or ClusterComponentType
-    name: deployment/service   # format: workloadType/typeName
-  owner:
-    projectName: default
-  parameters: {}
----
-apiVersion: openchoreo.dev/v1alpha1
-kind: Workload
-metadata:
-  name: my-app-workload
-  namespace: default
-spec:
-  owner:
-    componentName: my-app
-    projectName: default
-  container:
-    image: "myregistry/my-app:v1.0.0"
-    env:
-      - key: PORT
-        value: "8080"
-  endpoints:
-    http:
-      port: 8080
-      type: HTTP                  # HTTP | GraphQL | Websocket | gRPC | TCP | UDP
-      visibility: ["external"]
+autoDeploy: true
+componentType:
+  kind: ClusterComponentType    # or ComponentType for namespace-scoped
+  name: deployment/service      # format: workloadType/typeName
+owner:
+  projectName: default
+parameters: {}
 ```
 
-Apply: `occ apply -f my-app.yaml`
+### Minimal example — Workload spec (passed into `create_workload`)
+
+```yaml
+owner:
+  componentName: my-app
+  projectName: default
+container:
+  image: "myregistry/my-app:v1.0.0"
+  env:
+    - key: PORT
+      value: "8080"
+endpoints:
+  http:
+    port: 8080
+    type: HTTP                  # HTTP | GraphQL | Websocket | gRPC | TCP | UDP
+    visibility: ["external"]
+```
 
 ### With Traits
 
+Trait attachment requires editing `spec.traits[]` on the Component. **There is no MCP write surface for this** (`patch_component` does not cover it) — route to `openchoreo-platform-engineer` to apply a Component spec like:
+
 ```yaml
-apiVersion: openchoreo.dev/v1alpha1
-kind: Component
-metadata:
-  name: my-app
-  namespace: default
 spec:
   autoDeploy: true
   componentType:
@@ -83,7 +69,7 @@ spec:
   parameters: {}
   traits:
     - name: persistent-volume
-      kind: Trait              # or ClusterTrait
+      kind: ClusterTrait              # or Trait for namespace-scoped
       instanceName: data-storage
       parameters:
         volumeName: data
@@ -91,47 +77,45 @@ spec:
         containerName: app
 ```
 
+Per-environment trait *parameter overrides* are different — those use `update_release_binding` with `trait_environment_configs` and stay in this skill. See `recipes/override-per-environment.md`.
+
 ## Building from Source
 
-For source-to-image builds, configure a Workflow on the Component. The exact workflow name and parameter schema come from the cluster, so inspect `occ workflow list` and `occ workflow get <name>` or use a matching sample from `samples/from-source/`.
+For source-to-image builds, configure a Workflow on the Component. The exact workflow name and parameter schema come from the cluster — inspect with `list_cluster_workflows` and `get_cluster_workflow_schema`, or use a matching sample from `samples/from-source/`.
+
+Component spec (passed into `create_component`):
 
 ```yaml
-apiVersion: openchoreo.dev/v1alpha1
-kind: Component
-metadata:
-  name: my-app
-  namespace: default
-spec:
-  owner:
-    projectName: default
-  componentType:
-    kind: ClusterComponentType
-    name: deployment/service
-  autoDeploy: true
-  workflow:
-    kind: ClusterWorkflow
-    name: dockerfile-builder
-    parameters:
-      repository:
-        url: "https://github.com/myorg/my-app"
-        revision:
-          branch: "main"
-        appPath: "."
-      docker:
-        context: "."
-        filePath: "./Dockerfile"
+owner:
+  projectName: default
+componentType:
+  kind: ClusterComponentType
+  name: deployment/service
+autoDeploy: true
+workflow:
+  kind: ClusterWorkflow
+  name: dockerfile-builder
+  parameters:
+    repository:
+      url: "https://github.com/myorg/my-app"
+      revision:
+        branch: "main"
+      appPath: "."
+    docker:
+      context: "."
+      filePath: "./Dockerfile"
 ```
 
-Trigger builds: `occ component workflow run my-app`
-Follow build logs: `occ component workflow logs my-app -f`
+Trigger builds: `trigger_workflow_run` for the component.
+Follow build logs: `query_workflow_logs` with the run name.
 
 **Important path rule for multi-directory repos**: `repository.appPath` tells the workflow where the service source lives and where to find `workload.yaml`, but Docker workflow paths still need to match the actual repo layout. If the service lives under `backend/` with `backend/Dockerfile`, use `docker.context: ./backend` and `docker.filePath: ./backend/Dockerfile` or the equivalent leading-slash form used by repo samples. Do not assume `appPath: ./backend` makes `./Dockerfile` resolve inside that directory.
 
-**Important project rule for source builds**: The Component's `spec.owner.projectName` and the active `occ` context project must agree. The workflow's parameter shape comes from the workflow's own schema — inspect with `occ clusterworkflow get <name>` to confirm what the build pipeline accepts.
+**Important project rule for source builds**: The Component's `spec.owner.projectName` must match the project the workflow runs under. The workflow's parameter shape comes from the workflow's own schema — inspect with `get_cluster_workflow_schema` to confirm what the build pipeline accepts.
 
 ### The Workload is auto-generated — don't create one yourself
 
-For source-build components, **never call `create_workload` / `occ workload create`**. The build's `generate-workload` step does it for you:
+For source-build components, **never call `create_workload`**. The build's `generate-workload` step does it for you:
 
 - It produces a Workload named **`{component}-workload`** (always — the descriptor's `metadata.name` is ignored).
 - If `workload.yaml` exists at `appPath` root in the repo, the build inlines it: endpoints, dependencies, env vars, files all flow through.
@@ -139,56 +123,44 @@ For source-build components, **never call `create_workload` / `occ workload crea
 
 After the build, query the workload by its real name:
 
-```bash
-occ workload list --component my-app                # see {component}-workload appear
-occ workload get my-app-workload                    # NOT 'my-app' — that returns "not found"
+```
+list_workloads(namespace, project, component)        → see {component}-workload appear
+get_workload(namespace, '{component}-workload')      → NOT '<component>' — that returns "not found"
 ```
 
 ### Enriching the auto-generated Workload
 
 If you need to add endpoints, dependencies, or env vars after a build, there are two paths:
 
-**Preferred — edit `workload.yaml` and rebuild.** Commit the descriptor changes, then `occ component workflow run my-app`. The new build produces a fresh `{component}-workload` with the descriptor inlined. This is the canonical path: source of truth lives in the repo, deployments are reproducible, history is auditable.
+**Preferred — edit `workload.yaml` and rebuild.** Commit the descriptor changes, then `trigger_workflow_run`. The new build produces a fresh `{component}-workload` with the descriptor inlined. This is the canonical path: source of truth lives in the repo, deployments are reproducible, history is auditable.
 
-**Fallback — `update_workload` against the auto-generated name.** Use this only when rebuilding isn't possible (e.g., the repo has no `workload.yaml` and you can't edit the source). Either via MCP:
+**Fallback — `update_workload` against the auto-generated name.** Use this only when rebuilding isn't possible (e.g., the repo has no `workload.yaml` and you can't edit the source):
 
 ```
 update_workload(namespace, workload_name='my-app-workload', workload_spec={...})
 ```
 
-or `occ apply -f` over the existing workload name:
+The spec body looks like:
 
 ```yaml
-# /tmp/my-app-workload.yaml
-apiVersion: openchoreo.dev/v1alpha1
-kind: Workload
-metadata:
-  name: my-app-workload                # <component>-workload, NOT my-app
-  namespace: default
-  labels:
-    openchoreo.dev/project: my-project
-    openchoreo.dev/component: my-app
-spec:
-  owner:
-    projectName: my-project
-    componentName: my-app
-  container:
-    image: <existing image from the auto-generated workload>
-  endpoints:
-    api:
-      type: HTTP
-      port: 8080
-      visibility: ["external"]
-  # … endpoints, dependencies.endpoints[], etc.
+owner:
+  projectName: my-project
+  componentName: my-app
+container:
+  image: <existing image from the auto-generated workload>
+endpoints:
+  api:
+    type: HTTP
+    port: 8080
+    visibility: ["external"]
+# … endpoints, dependencies.endpoints[], etc.
 ```
 
-```bash
-occ apply -f /tmp/my-app-workload.yaml
-```
+> **`update_workload` sends the full spec, not a partial patch.** Always `get_workload` first, modify locally, send the complete `workload_spec` back. Omitting a field deletes it.
 
 > **Don't omit `endpoints:`.** The default ComponentType (`deployment/service`) has a validation rule `${size(workload.endpoints) > 0}` — a Workload with no endpoints will cause `RenderingFailed` on the ReleaseBinding. If your component genuinely has no endpoints (a worker / job), use a worker / cronjob ComponentType instead.
 
-> **Don't drop the image** when applying an enriched workload. The auto-generated workload already has the built image set. If you `occ apply -f` a Workload without the image (or with a wrong / placeholder image), you overwrite it. Get the current image first via `occ workload get my-app-workload | grep image`.
+> **Don't drop the image** when sending the updated spec. The auto-generated workload already has the built image set. If you send a Workload spec without the image (or with a wrong / placeholder image), you overwrite it. Read the current image first via `get_workload`.
 
 ## How the CI Pipeline Works
 
@@ -202,7 +174,7 @@ The `workload.yaml` descriptor bridges this gap. It's a declaration of your app'
 
 ### Build Pipeline Flow
 
-When you trigger a build (`occ component workflow run my-app`), here's what happens:
+When you trigger a build (`trigger_workflow_run`), here's what happens:
 
 ```
 1. Source checkout
@@ -212,11 +184,8 @@ When you trigger a build (`occ component workflow run my-app`), here's what happ
    └── Run Dockerfile (or buildpack), push image to registry
 
 3. Generate Workload CR  (the key step)
-   └── Run `occ workload create` with:
-       - The built image reference from step 2
-       - The workload.yaml descriptor from your source (if present)
-       - Component/project context
-   └── Outputs a complete Workload CR YAML
+   └── Read workload.yaml from your source (if present), merge with the built
+       image reference and component/project context, emit a complete Workload CR.
 
 4. Controller picks up the Workload CR
    └── Creates or updates the Workload resource in the control plane
@@ -227,15 +196,7 @@ When you trigger a build (`occ component workflow run my-app`), here's what happ
 
 The build workflow (an Argo Workflow) has a special step named `generate-workload-cr`. The WorkflowRun controller watches for this specific step name and reads its output parameter `workload-cr`.
 
-Inside this step, `occ workload create` runs:
-```
-occ workload create \
-  --image <built-image-from-previous-step> \
-  --descriptor workload.yaml \
-  --output /mnt/vol/workload-cr.yaml
-```
-
-This reads your `workload.yaml`, merges it with the built image reference, and produces a full Workload CR. The controller then creates or updates the Workload in the control plane.
+This step reads your `workload.yaml`, merges it with the built image reference, and emits a full Workload CR. The controller then creates or updates the Workload in the control plane. (This is internal to the build pipeline — developers never invoke it directly.)
 
 **With descriptor**: The Workload CR gets endpoints, dependencies, configurations, and the image. The platform knows how to route traffic, inject connection env vars, and configure networking.
 
@@ -246,8 +207,8 @@ This reads your `workload.yaml`, merges it with the built image reference, and p
 - If your service exposes APIs or needs to talk to other services, you need a `workload.yaml`
 - If it's a simple worker with no network exposure, you might skip it
 - The descriptor must be at the `appPath` root so the build step can find it
-- Build logs (`occ component workflow logs my-app -f`) show whether the descriptor was found and processed
-- After a successful build, check `occ workload get <name>` to verify endpoints and connections made it through
+- Build logs (`query_workflow_logs`) show whether the descriptor was found and processed
+- After a successful build, check `get_workload` to verify endpoints and connections made it through
 
 ## Workload Descriptor (workload.yaml)
 
@@ -324,39 +285,27 @@ HTTP, REST, gRPC, GraphQL, Websocket, TCP, UDP
 ### Dependency EnvBindings
 The platform resolves the target service address and injects env vars. Use dependencies instead of hardcoding URLs. At least one envBinding field should be set.
 
-## Using occ component scaffold
+## Using schema discovery
 
-The fastest way to create component YAML. Reads available types from the cluster and generates properly structured YAML.
+Before authoring a Component or Workload spec, fetch the live schema from the cluster — that's the fastest way to construct a valid spec without guessing fields.
 
-```bash
-# See what's available
-occ clustercomponenttype list
-occ componenttype list
-occ clustertrait list
-occ trait list
-
-# Generate YAML (--type format is workloadType/typeName)
-occ component scaffold my-app --clustercomponenttype deployment/service -o my-app.yaml
-occ component scaffold my-app --clustercomponenttype deployment/web-application \
-  --traits persistent-volume,ingress --workflow react -o my-app.yaml
+```
+list_cluster_component_types               → what types exist
+get_cluster_component_type_schema           → field shape for a chosen type
+list_cluster_traits                         → what traits exist
+get_cluster_trait_schema                    → trait parameter shape
+get_workload_schema                         → Workload spec shape
+list_cluster_workflows                      → build workflows
+get_cluster_workflow_schema                 → workflow parameter shape
 ```
 
-The component name is positional. `occ component scaffold --name ...` is invalid.
+Pass `component_type: "{workloadType}/{name}"` (e.g. `deployment/service`) on `create_component` — that's the canonical format.
 
 ## Deploying and Promoting
 
-```bash
-# Deploy latest release to root environment
-occ component deploy my-app
+`auto_deploy: true` on the Component creates the **first environment's** ReleaseBinding automatically. Subsequent environments are manual via `create_release_binding`. To roll back or replace the release on an existing binding, use `update_release_binding release_name: <new>`. To take a binding offline without deleting it, `update_release_binding_state release_state: Undeploy`.
 
-# Promote to next environment
-occ component deploy my-app --to staging
-occ component deploy my-app --to production
-
-# Deploy with env-specific overrides
-occ component deploy my-app --to production \
-  --set spec.componentTypeEnvironmentConfigs.replicas=3
-```
+The full step-by-step (first deploy, promotion, rollback, undeploy/redeploy) is in `recipes/deploy-and-promote.md`.
 
 ## ReleaseBinding with Overrides
 
@@ -780,7 +729,7 @@ create_component(namespace, project, name, componentType)   ← no workflow para
 
 ### Step 4 — Create workloads with full env vars from the official manifests
 
-Apply workloads using `occ apply -f <file>` for batches. Each workload must include:
+Create each workload via `create_workload`. Each workload must include:
 
 1. The pre-built image
 2. **All env vars from the official manifest** — `PORT`, feature flags, and any explicit service addresses not covered by dependencies
@@ -829,12 +778,12 @@ Apps may `panic` or crash at startup if an env var for an optional or add-on ser
 
 ### Multi-service deployment approach
 
-For apps with many services, batch workloads into YAML files and apply with `occ apply`:
+For apps with many services, create workloads in passes:
 
-1. Write workloads **without** dependencies to one file — apply first (simpler, creates all base deployments)
-2. Write workloads **with** dependencies to a second file — apply second
-3. Verify with `list_release_bindings` per component
-4. For any service still failing, immediately check `query_component_logs` — do not assume a platform issue before reading the app logs
+1. **Pass 1** — workloads with no dependencies. Call `create_workload` for each (simpler, fewer failure modes).
+2. **Pass 2** — workloads that depend on Pass 1 services. Same call, with `dependencies.endpoints[]` populated.
+3. Verify with `list_release_bindings` per component.
+4. For any service still failing, immediately check `query_component_logs` — do not assume a platform issue before reading the app logs.
 
 ### Checklist for third-party app deployment
 
@@ -842,83 +791,85 @@ For apps with many services, batch workloads into YAML files and apply with `occ
 2. [ ] Fetch official Kubernetes/Helm manifests — extract env vars for every service
 3. [ ] Identify services with cloud-vendor SDK dependencies — note disable flags
 4. [ ] Identify optional service env vars — plan placeholder values
-5. [ ] Create project
+5. [ ] Create project (`create_project`)
 6. [ ] Create all components via `create_component` **without** `workflow` parameter
-7. [ ] Apply workloads via `occ apply` with: image, all env vars from manifests, dependencies
-8. [ ] Verify release binding status for each component
+7. [ ] Create workloads via `create_workload` with: image, all env vars from manifests, dependencies
+8. [ ] Verify release binding status for each component (`list_release_bindings` / `get_release_binding`)
 9. [ ] For any failing component, check logs with `query_component_logs` immediately before assuming platform issue
 
 ---
 
 ## End-to-End Deployment Checklist
 
-1. **Check CLI**: `occ version` (installed?)
-2. **Configure API**: `occ config controlplane update default --url <URL>` then `occ login`
-3. **Verify connection**: `occ namespace list`
-4. **Set context**: `occ config context add myctx --controlplane default --credentials default --namespace <ns> --project <project>` then `occ config context use myctx`
-5. **Discover only what you need**:
-   - Project: `occ project list`
-   - Environments/pipeline: `occ environment list`, `occ deploymentpipeline list`
-   - Component types: `occ clustercomponenttype list`, `occ componenttype list`
-   - Workflows for source builds: `occ workflow list`
-6. **Scaffold**: `occ component scaffold my-app --clustercomponenttype deployment/service -o my-app.yaml`
-7. **Align project references**: set the target project in context, `spec.owner.projectName`, and `spec.workflow.parameters.scope.projectName`
-8. **Configure source builds**: If building from source, add `spec.workflow` to the Component and add `workload.yaml` at the `appPath` root
-9. **Adapt the app**: Replace hardcoded URLs and secrets with env vars plus local defaults
-10. **Apply**: `occ apply -f my-app.yaml`
-11. **Build** (if from source): `occ component workflow run my-app`, follow with `occ component workflow logs my-app -f`
-12. **Verify**: `occ component get my-app`, `occ releasebinding list --project <proj> --component my-app`, `occ releasebinding get <binding>`, `occ component logs my-app`
-13. **Promote**: `occ component deploy my-app --to staging`
+1. **Verify MCP connectivity**: `list_namespaces`. If it fails, the control-plane MCP server isn't reachable — fix that before continuing.
+2. **Pick the working scope**: confirm namespace and project exist (`list_projects`). Create a project with `create_project` if needed.
+3. **Discover only what you need**:
+   - Environments/pipeline: `list_environments`, `list_deployment_pipelines`
+   - Component types: `list_cluster_component_types`, `get_cluster_component_type_schema`
+   - Traits: `list_cluster_traits`, `get_cluster_trait_schema`
+   - Workflows for source builds: `list_cluster_workflows`, `get_cluster_workflow_schema`
+4. **Author the Component spec** from the schema. Set `spec.owner.projectName` and (for source builds) `spec.workflow.parameters.repository.*`.
+5. **Configure source builds**: If building from source, set `spec.workflow` on the Component and add `workload.yaml` at the `appPath` root in the repo.
+6. **Adapt the app**: Replace hardcoded URLs and secrets with env vars plus local defaults.
+7. **Create the component**: `create_component`. For BYOI follow with `create_workload`. For source-build, the workload is auto-generated by the build — do not call `create_workload`.
+8. **Build** (if from source): `trigger_workflow_run`, follow with `query_workflow_logs` and `get_workflow_run`.
+9. **Verify**: `get_component`, `list_release_bindings`, `get_release_binding`, `query_component_logs`.
+10. **Promote**: `create_release_binding` for each downstream environment, with optional `component_type_environment_configs` / `trait_environment_configs` / `workload_overrides`.
 
 ## Debugging Deployments
 
-All debugging goes through MCP and `occ`. Cluster-level access is out of scope for this skill.
+All debugging goes through MCP. Cluster-level access is out of scope for this skill — for that, hand off to `openchoreo-platform-engineer`.
 
-```bash
+```
 # 1. Check component status and conditions
-occ component get my-app
+get_component(namespace, project, component)
 
 # 2. Check workload
-occ workload get my-app-workload
+get_workload(namespace, '{component}-workload')
 
 # 3. Check release bindings
-occ releasebinding list --project my-proj --component my-app
-occ releasebinding get <binding-name>
+list_release_bindings(namespace, project, component)
+get_release_binding(namespace, binding_name)
 
 # 4. View application logs
-occ component logs my-app --env dev --since 30m
+query_component_logs(namespace, project, component, environment, start_time, end_time)
 
 # 5. View build logs
-occ component workflow logs my-app -f
+query_workflow_logs(namespace, workflow_run_name, start_time, end_time)
 
 # 6. Check workflow runs
-occ component workflowrun list my-app
+list_workflow_runs(namespace, project, component)
+get_workflow_run(namespace, run_name)
+
+# 7. Pod / Deployment events when component logs are empty (e.g. ImagePullBackOff)
+get_resource_events(namespace, release_binding_name, group, version, kind, resource_name)
+
+# 8. Pod logs for a specific crashing pod
+get_resource_logs(namespace, release_binding_name, pod_name, since_seconds)
 ```
 
-Treat workflow logs, Component status, and ReleaseBinding status as the source of truth. `occ component workflowrun list my-app` can lag briefly after a build that already completed successfully.
+Treat workflow logs, Component status, and ReleaseBinding status as the source of truth. `list_workflow_runs` can lag briefly after a build that already completed successfully — confirm with `get_workflow_run` and `get_component`.
 
-Remember that `occ component workflow logs` does not accept `--project`; set or update context first when you switch projects.
+Read `status.conditions[]` on each resource. Common condition issues:
 
-Read the `status.conditions` section in `occ get` output. Common condition issues:
-
-**ComponentType not found**: The referenced type doesn't exist. Check `occ clustercomponenttype list`.
+**ComponentType not found**: The referenced type doesn't exist. Check `list_cluster_component_types`.
 
 **Build not running**: WorkflowPlane might not be configured. Escalate to PE.
 
 **Rendering failed**: Usually a missing gateway or invalid parameter. Check the error message in conditions.
 
-**Endpoint not accessible**: Verify the binding has a resolved URL. Check `occ releasebinding get <binding>` and inspect `status.endpoints`, `invokeURL`, `externalURLs`, and `internalURLs`. If no external URL is present, check endpoint visibility and gateway setup.
+**Endpoint not accessible**: Verify the binding has a resolved URL via `get_release_binding` — inspect `status.endpoints[]`, `invokeURL`, `externalURLs`, and `internalURLs`. If no external URL is present, check endpoint visibility and gateway setup.
 
-**Image pull errors**: Private registry needs imagePullSecrets in the ComponentType. Escalate to PE.
+**Image pull errors**: Use `get_resource_events` on the Pod (the container logs are empty for `ImagePullBackOff`). Private registry needs imagePullSecrets in the ComponentType — escalate to PE.
 
-**Workload not created by build**: Check that `workload.yaml` exists at the `appPath` root with the correct name. Check build logs for descriptor-related errors.
+**Workload not created by build**: Check that `workload.yaml` exists at the `appPath` root with the correct name. Check build logs (`query_workflow_logs`) for descriptor-related errors.
 
 **Dockerfile not found during source build**: Verify `docker.context` and `docker.filePath` are repo-root-relative paths to the real Docker build inputs. `appPath` does not rewrite those paths.
 
-**Workload exists but Component says it is missing**: Compare `occ workload get <name>` against the Component's project. If `spec.owner.projectName` on the Workload is wrong, the source-build scope likely pointed at the wrong project. Fix the Component/workflow project refs, then regenerate or recreate the Workload; `spec.owner` is not safely patchable in place.
+**Workload exists but Component says it is missing**: Compare `get_workload` output against the Component's project. If `spec.owner.projectName` on the Workload is wrong, the source-build scope likely pointed at the wrong project. Fix the Component/workflow project refs, then regenerate the Workload; `spec.owner` is not safely patchable in place.
 
 **Frontend loads but `/api/...` through the frontend returns 404**: Check whether the backend endpoint defines a `basePath` and the proxy upstream already includes it through a connection `address`. If so, switch the proxy to host/port bindings or remove the duplicated path.
 
 **Frontend loads but browser requests fail with `localhost` or mixed-content behavior**: Check the built frontend env defaults. Prefer `/api` as the browser-facing default and avoid `||` fallbacks that can override intentional empty-string or same-origin configs.
 
-If conditions show errors you can't resolve through occ, escalate to the platform engineering team with the exact error message.
+If conditions show errors you can't resolve through MCP, escalate to `openchoreo-platform-engineer` with the exact error message.

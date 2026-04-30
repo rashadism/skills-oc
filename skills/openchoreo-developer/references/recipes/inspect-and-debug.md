@@ -2,8 +2,6 @@
 
 Read runtime logs, check status conditions, fetch pod-level events, and diagnose common deploy failures (CrashLoopBackOff, ImagePullBackOff, NotReady).
 
-> **Tool surface preference: MCP first, `occ` CLI as fallback.** Same as every recipe in this skill.
-
 ## When to use
 
 - "Is my deploy working?" — verify after `recipes/deploy-prebuilt-image.md`, `recipes/build-from-source.md`, or `recipes/deploy-and-promote.md`
@@ -29,7 +27,7 @@ Inspect top-down. The most specific signal — a pod's events or container logs 
 ### Component-level (resource conditions)
 
 ```
-mcp__openchoreo-cp__get_component
+get_component
   namespace_name: default
   component_name: my-service
 ```
@@ -42,7 +40,7 @@ Look at `status.conditions[]`:
 | `Reconciled` | `True` | Controller picked up the latest spec |
 
 ```
-mcp__openchoreo-cp__get_workload
+get_workload
   namespace_name: default
   workload_name: my-service-workload
 ```
@@ -50,11 +48,11 @@ mcp__openchoreo-cp__get_workload
 ### ReleaseBinding-level (per-environment health)
 
 ```
-mcp__openchoreo-cp__list_release_bindings
+list_release_bindings
   namespace_name: default
   component_name: my-service
 
-mcp__openchoreo-cp__get_release_binding
+get_release_binding
   namespace_name: default
   binding_name: my-service-development
 ```
@@ -67,21 +65,12 @@ mcp__openchoreo-cp__get_release_binding
 
 `status.endpoints[]` holds the deployed URLs.
 
-### CLI equivalents
-
-```bash
-occ component get my-service --namespace default
-occ workload get my-service-workload --namespace default
-occ releasebinding list --namespace default --project default --component my-service
-occ releasebinding get my-service-development --namespace default
-```
-
 ## Recipe — runtime logs
 
-### MCP (preferred for log queries — supports filters, search, pagination)
+`query_component_logs` supports filters, search, and pagination:
 
 ```
-mcp__openchoreo-obs__query_component_logs
+query_component_logs
   namespace: default
   project: default
   component: my-service
@@ -96,16 +85,6 @@ mcp__openchoreo-obs__query_component_logs
 
 Both `start_time` and `end_time` are required and must be RFC3339.
 
-### CLI
-
-```bash
-occ component logs my-service --namespace default --project default
-occ component logs my-service -f                            # follow / tail
-occ component logs my-service --env production
-occ component logs my-service --tail 100
-occ component logs my-service --since 1h
-```
-
 ## Recipe — pod-level inspection
 
 When component-level logs are empty (the container never started) or you need K8s events.
@@ -113,7 +92,7 @@ When component-level logs are empty (the container never started) or you need K8
 ### Resource events for a binding
 
 ```
-mcp__openchoreo-cp__get_resource_events
+get_resource_events
   namespace_name: default
   release_binding_name: my-service-development
   group: apps
@@ -127,7 +106,7 @@ Use this for `ImagePullBackOff`, scheduling failures, OOM kills, etc. — events
 ### Pod logs (for crashlooping containers where component logs are empty)
 
 ```
-mcp__openchoreo-cp__get_resource_logs
+get_resource_logs
   namespace_name: default
   release_binding_name: my-service-development
   pod_name: my-service-7f9c-abc12
@@ -166,13 +145,13 @@ If the cause is in the application (bad config, missing env var, dependency unre
 For runtime metrics and distributed traces, the observer MCP server exposes:
 
 ```
-mcp__openchoreo-obs__query_resource_metrics       # CPU, memory, network
-mcp__openchoreo-obs__query_http_metrics           # HTTP-level (request rate, latency, status codes)
-mcp__openchoreo-obs__query_traces                 # tracing spans
-mcp__openchoreo-obs__query_trace_spans
-mcp__openchoreo-obs__get_span_details
-mcp__openchoreo-obs__query_alerts                 # active alerts
-mcp__openchoreo-obs__query_incidents              # incident history
+query_resource_metrics       # CPU, memory, network
+query_http_metrics           # HTTP-level (request rate, latency, status codes)
+query_traces                 # tracing spans
+query_trace_spans
+get_span_details
+query_alerts                 # active alerts
+query_incidents              # incident history
 ```
 
 All take a `namespace`, scoping filters (`project`, `component`, `environment`), and `start_time` / `end_time` (RFC3339). Use these when logs alone don't explain the symptom — e.g. P99 latency spikes, request error rates, or a downstream service slowing the trace.

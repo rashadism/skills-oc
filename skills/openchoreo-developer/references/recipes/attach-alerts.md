@@ -2,7 +2,7 @@
 
 Attach the `observability-alert-rule` trait to a Component so OpenChoreo fires log- or metric-based alerts when conditions are met. Per-environment notification channels are wired through the ReleaseBinding.
 
-> **Tool surface preference: MCP first, `occ` CLI as fallback.** Same as every recipe in this skill.
+> **Trait *attachment* on the Component has no MCP write surface.** Hand off to `openchoreo-platform-engineer` to apply the Component spec change. The trait's *per-environment configuration* (channels, enabled, thresholds) is on the ReleaseBinding and stays in this skill via `update_release_binding`.
 
 ## When to use
 
@@ -17,7 +17,7 @@ Channel and incident infrastructure is **PE-owned** — the developer attaches t
 
 1. The target environment has a notification channel configured. List existing references:
    ```
-   mcp__openchoreo-obs__query_alerts
+   query_alerts
      namespace: default
      start_time: <RFC3339>
      end_time:   <RFC3339>
@@ -27,17 +27,17 @@ Channel and incident infrastructure is **PE-owned** — the developer attaches t
 
 ## Recipe — define the alert on the Component
 
-The trait attaches in the Component's `spec.traits[]`. There is no MCP write surface for Component updates — use `occ apply -f`.
+The trait attaches in the Component's `spec.traits[]`. **No MCP write surface for this** — author the spec here, then hand off to `openchoreo-platform-engineer` to apply.
 
 ### 1. Discover the trait's parameter schema
 
 ```
-mcp__openchoreo-cp__list_cluster_traits
-mcp__openchoreo-cp__get_cluster_trait_schema
+list_cluster_traits
+get_cluster_trait_schema
   ct_name: observability-alert-rule
 ```
 
-### 2. Author Component YAML with the trait attached
+### 2. Author the Component spec with the trait attached
 
 Copy `assets/component-with-alert-trait.yaml` and edit. The trait has these top-level parameter fields:
 
@@ -68,16 +68,14 @@ spec:
 
 A Component can attach the same trait multiple times with different `instanceName`s — e.g. one log-based alert and one metric-based alert.
 
-### 3. Apply
+### 3. Hand off to platform-engineer for apply
 
-```bash
-occ apply -f /tmp/component.yaml
-```
+Activate `openchoreo-platform-engineer` with the authored Component spec — that skill has the surface to apply it.
 
 ### 4. Verify
 
 ```
-mcp__openchoreo-cp__get_component
+get_component
   namespace_name: default
   component_name: my-service
 ```
@@ -88,10 +86,8 @@ Look at `status.conditions[]` for `Reconciled: True`, then check `spec.traits[]`
 
 The trait *defines* what to alert on. Channels — *where* alerts go — are configured per-environment via `traitEnvironmentConfigs` on the ReleaseBinding.
 
-### MCP (preferred)
-
 ```
-mcp__openchoreo-cp__update_release_binding
+update_release_binding
   namespace_name: default
   binding_name: my-service-production
   trait_environment_configs:
@@ -108,17 +104,6 @@ mcp__openchoreo-cp__update_release_binding
 ```
 
 If `channels` is omitted, the environment's default channel is used (the first channel created in that env is auto-marked default).
-
-### CLI
-
-For trivial overrides:
-
-```bash
-occ component deploy my-service --to production \
-  --set spec.traitEnvironmentConfigs.high-error-rate-log-alert.actions.notifications.channels[0]=devops-slack-prod
-```
-
-For non-trivial config, edit the ReleaseBinding YAML and `occ apply -f`.
 
 ### Disable the alert in some environments
 
@@ -174,7 +159,7 @@ trait_environment_configs:
 Read-only — agent / user inspection.
 
 ```
-mcp__openchoreo-obs__query_alerts
+query_alerts
   namespace: default
   project: default
   component: my-service
@@ -183,7 +168,7 @@ mcp__openchoreo-obs__query_alerts
 ```
 
 ```
-mcp__openchoreo-obs__query_incidents
+query_incidents
   namespace: default
   project: default
   component: my-service
@@ -191,11 +176,11 @@ mcp__openchoreo-obs__query_incidents
   end_time:   <RFC3339>
 ```
 
-Acknowledging and resolving incidents is done through the Backstage portal — there is no MCP/`occ` write surface for incident state changes.
+Acknowledging and resolving incidents is done through the Backstage portal — there is no MCP write surface for incident state changes.
 
 ## Gotchas
 
-- **No MCP for Component updates** — trait attachment goes through `occ apply -f`. The trait's *per-environment configuration* (channels, enabled, etc.) goes through `update_release_binding` MCP, since it's on the binding, not the Component.
+- **No MCP for Component trait attachment** — hand off to `openchoreo-platform-engineer` to apply the Component spec change. The trait's *per-environment configuration* (channels, enabled, etc.) stays in this skill via `update_release_binding`.
 - **`triggerAiRca: true` requires `incident.enabled: true`.** Standalone AI RCA without an incident is invalid; the controller rejects it.
 - **Without a notification channel, the ReleaseBinding fails to apply the trait.** Either a channel exists in the env (and is referenced in `actions.notifications.channels[]` or used as the env default), or the alert never fires anywhere reachable. If apply succeeds but no alerts arrive, the channel is the first thing to check (PE side).
 - **`instanceName` must be unique per Component** — but the same `name: observability-alert-rule` can repeat across different `instanceName`s. The override key in `trait_environment_configs` is the `instanceName`.

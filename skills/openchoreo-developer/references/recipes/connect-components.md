@@ -2,8 +2,6 @@
 
 Wire one Component to another's endpoint so OpenChoreo injects the resolved service address as an env var. Uses `spec.dependencies.endpoints[]` on the consuming Workload.
 
-> **Tool surface preference: MCP first, `occ` CLI as fallback.** Same as every recipe in this skill.
-
 ## When to use
 
 - One component needs to call another component's endpoint
@@ -26,17 +24,17 @@ Wire one Component to another's endpoint so OpenChoreo injects the resolved serv
 To inspect a target's endpoint visibility:
 
 ```
-mcp__openchoreo-cp__get_workload
+get_workload
   namespace_name: default
   workload_name: <target>-workload
 ```
 
-## Recipe — MCP (preferred)
+## Recipe
 
 ### 1. Read the consuming Workload
 
 ```
-mcp__openchoreo-cp__get_workload
+get_workload
   namespace_name: default
   workload_name: frontend-workload
 ```
@@ -46,7 +44,7 @@ mcp__openchoreo-cp__get_workload
 Send the full updated `workload_spec` with a new `dependencies` block:
 
 ```
-mcp__openchoreo-cp__update_workload
+update_workload
   namespace_name: default
   workload_name: frontend-workload
   workload_spec:
@@ -69,7 +67,7 @@ OpenChoreo injects `USER_SERVICE_URL` (and any other env vars in `envBindings`) 
 Once the redeploy is `Ready`, fetch runtime logs and confirm the env var resolves:
 
 ```
-mcp__openchoreo-obs__query_component_logs
+query_component_logs
   namespace: default
   component: frontend
   start_time: <RFC3339>
@@ -78,28 +76,6 @@ mcp__openchoreo-obs__query_component_logs
 ```
 
 For deeper inspection, see `recipes/inspect-and-debug.md`.
-
-## Recipe — `occ` CLI (fallback)
-
-### 1. Read the consuming Workload
-
-```bash
-occ workload get frontend-workload --namespace default
-```
-
-### 2. Edit the YAML and apply
-
-Add the `dependencies` block under `spec`, then:
-
-```bash
-occ apply -f /tmp/frontend-workload.yaml
-```
-
-### 3. Verify
-
-```bash
-occ component logs frontend --namespace default
-```
 
 ## Patterns
 

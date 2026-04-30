@@ -2,8 +2,6 @@
 
 Customise replicas, resources, env vars, files, and trait parameters per environment without changing the base Component or Workload. Lives in the `ReleaseBinding` for that environment.
 
-> **Tool surface preference: MCP first, `occ` CLI as fallback.** Same as every recipe in this skill.
-
 ## When to use
 
 - Production needs more replicas / CPU / memory than dev
@@ -23,7 +21,7 @@ A `ReleaseBinding` already exists for the target environment. Created automatica
 To list bindings:
 
 ```
-mcp__openchoreo-cp__list_release_bindings
+list_release_bindings
   namespace_name: default
   component_name: my-service
 ```
@@ -40,14 +38,14 @@ ReleaseBinding componentTypeEnvironmentConfigs / traitEnvironmentConfigs / workl
 
 Most specific wins. The ReleaseBinding is the per-environment last word.
 
-## Recipe — MCP (preferred)
+## Recipe
 
 `update_release_binding` is a partial update — only the fields you pass are changed. Other fields (and the `release_name` itself) stay the same.
 
 ### Override replicas / resources
 
 ```
-mcp__openchoreo-cp__update_release_binding
+update_release_binding
   namespace_name: default
   binding_name: my-service-production
   component_type_environment_configs:
@@ -60,14 +58,14 @@ mcp__openchoreo-cp__update_release_binding
 The keys under `component_type_environment_configs` come from the ClusterComponentType's parameter schema:
 
 ```
-mcp__openchoreo-cp__get_cluster_component_type_schema
+get_cluster_component_type_schema
   cct_name: deployment/service
 ```
 
 ### Override workload env vars / files
 
 ```
-mcp__openchoreo-cp__update_release_binding
+update_release_binding
   namespace_name: default
   binding_name: my-service-production
   workload_overrides:
@@ -91,7 +89,7 @@ mcp__openchoreo-cp__update_release_binding
 Use the trait's `instanceName` from the Component's `spec.traits[].instanceName`:
 
 ```
-mcp__openchoreo-cp__update_release_binding
+update_release_binding
   namespace_name: default
   binding_name: my-service-production
   trait_environment_configs:
@@ -113,7 +111,7 @@ trait_environment_configs:
 ### Combined override (typical prod-tightening)
 
 ```
-mcp__openchoreo-cp__update_release_binding
+update_release_binding
   namespace_name: default
   binding_name: my-service-production
   component_type_environment_configs:
@@ -136,40 +134,12 @@ mcp__openchoreo-cp__update_release_binding
 ### Verify
 
 ```
-mcp__openchoreo-cp__get_release_binding
+get_release_binding
   namespace_name: default
   binding_name: my-service-production
 ```
 
 Check `status.conditions[]` for `Ready: True`, `Synced: True`. Then verify runtime behaviour with `recipes/inspect-and-debug.md`.
-
-## Recipe — `occ` CLI (fallback)
-
-`occ component deploy` accepts `--set` with dot-notation paths into the ReleaseBinding spec:
-
-```bash
-occ component deploy my-service --to production \
-  --set spec.componentTypeEnvironmentConfigs.replicas=3
-```
-
-```bash
-occ component deploy my-service --to production \
-  --set spec.componentTypeEnvironmentConfigs.resources.requests.cpu=500m \
-  --set spec.componentTypeEnvironmentConfigs.resources.requests.memory=512Mi
-```
-
-```bash
-occ component deploy my-service --to production \
-  --set spec.workloadOverrides.env.LOG_LEVEL=warn
-```
-
-For multiple non-trivial overrides, prefer authoring a full ReleaseBinding YAML and applying it:
-
-```bash
-cp <skill-root>/assets/releasebinding-overrides.yaml /tmp/rb.yaml
-# edit, then:
-occ apply -f /tmp/rb.yaml
-```
 
 ## Patterns
 

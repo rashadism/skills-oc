@@ -2,8 +2,6 @@
 
 Build a container image from a Git repository using a CI workflow, then deploy it as a Component. The workflow clones the repo, runs the configured builder (Dockerfile / buildpacks / Ballerina), pushes the image, and auto-generates a Workload from the build output.
 
-> **Tool surface preference: MCP first, `occ` CLI as fallback.** Same as every recipe in this skill.
-
 ## When to use
 
 - The user wants OpenChoreo to build their image from source
@@ -12,16 +10,10 @@ Build a container image from a Git repository using a CI workflow, then deploy i
 
 ## Prerequisites
 
-1. Logged in to the control plane:
-   ```bash
-   occ version
-   occ config context list
-   ```
+1. The control-plane MCP server is configured and reachable (`list_namespaces` returns).
 2. A Project exists (see [Create a Project](deploy-prebuilt-image.md#variant-create-a-project)).
 3. The repo URL, branch, and the path to the app inside the repo (`appPath`) are known.
-4. The ClusterComponentType you'll use lists the workflow you want in `allowedWorkflows`. Discover what's available:
-   - **MCP:** `mcp__openchoreo-cp__list_cluster_component_types`, then `mcp__openchoreo-cp__get_cluster_component_type` to read `allowedWorkflows`.
-   - **CLI:** `occ clustercomponenttype get <name>`.
+4. The ClusterComponentType you'll use lists the workflow you want in `allowedWorkflows`. Discover with `list_cluster_component_types`, then `get_cluster_component_type` to read `allowedWorkflows`.
 
 ## Available builders
 
@@ -34,25 +26,25 @@ Build a container image from a Git repository using a CI workflow, then deploy i
 
 All workflows share `repository.url`, `repository.revision.branch`, `repository.revision.commit` (optional), `repository.appPath`, and `repository.secretRef` (for private repos).
 
-## Recipe — MCP (preferred)
+## Recipe
 
 ### 1. Pick a workflow and inspect its schema
 
 ```
-mcp__openchoreo-cp__list_cluster_workflows
+list_cluster_workflows
 ```
 
 Pick one, then read the parameter schema so you know what fields to pass:
 
 ```
-mcp__openchoreo-cp__get_cluster_workflow_schema
+get_cluster_workflow_schema
   cwf_name: dockerfile-builder
 ```
 
 ### 2. Create the Component with `workflow` set
 
 ```
-mcp__openchoreo-cp__create_component
+create_component
   namespace_name: default
   project_name: default
   name: greeting-service
@@ -90,19 +82,19 @@ Commit and push before triggering the build — the build reads the descriptor a
 ### 4. Trigger a build
 
 ```
-mcp__openchoreo-cp__trigger_workflow_run
+trigger_workflow_run
   namespace_name: default
   project_name: default
   component_name: greeting-service
   commit: <optional commit SHA — defaults to HEAD of the configured branch>
 ```
 
-This uses the workflow already configured on the Component. For a one-off build with different parameters, `mcp__openchoreo-cp__create_workflow_run` lets you supply a `parameters` object directly.
+This uses the workflow already configured on the Component. For a one-off build with different parameters, `create_workflow_run` lets you supply a `parameters` object directly.
 
 ### 5. Monitor the build
 
 ```
-mcp__openchoreo-cp__list_workflow_runs
+list_workflow_runs
   namespace_name: default
   project_name: default
   component_name: greeting-service
@@ -111,7 +103,7 @@ mcp__openchoreo-cp__list_workflow_runs
 Pick the latest run name from the list, then:
 
 ```
-mcp__openchoreo-cp__get_workflow_run
+get_workflow_run
   namespace_name: default
   run_name: <run name>
 ```
@@ -121,7 +113,7 @@ Check `status.conditions` for `WorkflowSucceeded` / `WorkflowFailed`, and `statu
 For build logs:
 
 ```
-mcp__openchoreo-obs__query_workflow_logs
+query_workflow_logs
   namespace: default
   workflow_run_name: <run name>
   task_name: <e.g. containerfile-build — omit to fetch all tasks>
@@ -134,70 +126,26 @@ mcp__openchoreo-obs__query_workflow_logs
 After `WorkflowSucceeded`, the generated Workload triggers an auto-deploy (because `auto_deploy: true` on the Component). Verify with the same flow as BYOI:
 
 ```
-mcp__openchoreo-cp__get_component
-mcp__openchoreo-cp__list_release_bindings
-mcp__openchoreo-cp__get_release_binding
-mcp__openchoreo-obs__query_component_logs    # runtime logs once Ready
+get_component
+list_release_bindings
+get_release_binding
+query_component_logs    # runtime logs once Ready
 ```
 
 See `recipes/inspect-and-debug.md` for deeper inspection.
-
-## Recipe — `occ` CLI (fallback)
-
-### 1. Author the Component YAML
-
-Copy `assets/source-build-component.yaml`, edit `<COMPONENT_NAME>`, repo URL, branch, `appPath`, and the `docker.*` paths.
-
-### 2. (Recommended) Add `workload.yaml` to the repo
-
-Same as MCP step 3 — copy `assets/workload-descriptor.yaml`, edit, commit at `<appPath>/workload.yaml`.
-
-### 3. Apply the Component
-
-```bash
-occ apply -f /tmp/component.yaml
-```
-
-### 4. Trigger a build
-
-```bash
-occ component workflow run greeting-service
-```
-
-### 5. Monitor
-
-```bash
-occ component workflowrun list greeting-service       # all runs for this component
-occ workflowrun get <run-name>                        # full status, conditions, task phases
-occ workflowrun logs <run-name>                       # stream all logs
-occ workflowrun logs <run-name> -f                    # follow
-occ component workflowrun logs greeting-service       # latest run for this component
-```
-
-### 6. Verify the deploy
-
-```bash
-occ component get greeting-service
-occ releasebinding list --namespace default --project default --component greeting-service
-occ component logs greeting-service
-```
 
 ## Variant: private Git repository
 
 The build needs Git credentials. The platform must have a ClusterSecretStore wired to a backend (Vault / AWS Secrets Manager / OpenBao) — that's a PE-side prerequisite. Once that's in place, the developer:
 
-### 1. Create a SecretReference (CLI only — no MCP create)
+### 1. Create a SecretReference
 
-There is no MCP tool to create a SecretReference. Copy `assets/secret-reference-git.yaml`, fill in `<SECRET_NAME>` and the secret backend path, then:
+**No MCP write surface for SecretReference.** Hand off to `openchoreo-platform-engineer` to apply a SecretReference based on `assets/secret-reference-git.yaml` (filling in `<SECRET_NAME>` and the secret backend path).
 
-```bash
-occ apply -f /tmp/secret-reference.yaml
-```
-
-Verify it exists:
+Once the resource exists, verify it from this skill:
 
 ```
-mcp__openchoreo-cp__list_secret_references
+list_secret_references
   namespace_name: default
 ```
 
@@ -251,9 +199,9 @@ If all three match, the platform creates a WorkflowRun automatically with the co
 - **`workload.yaml` must live at the root of `appPath`**, not at the repo root (unless `appPath` is `/`). Build-time read; commits after the build don't affect already-built releases.
 - **Workflow must be in the ComponentType's `allowedWorkflows`.** If `create_component` fails with `ComponentValidationFailed`, the chosen workflow isn't allowed by the ComponentType — pick a different workflow or ask PE to extend `allowedWorkflows`.
 - **WorkflowRuns are imperative, not declarative.** Each one starts a build. Do not commit WorkflowRun YAML to a GitOps repo — it'll trigger duplicate builds on every reconcile.
-- **Required labels on a manual WorkflowRun YAML:** `openchoreo.dev/project` and `openchoreo.dev/component`. Missing them fails with `ComponentValidationFailed`. (Not an issue when using `trigger_workflow_run` MCP / `occ component workflow run` — those set the labels for you.)
+- **Required labels on a manual WorkflowRun YAML:** `openchoreo.dev/project` and `openchoreo.dev/component`. Missing them fails with `ComponentValidationFailed`. (Not an issue when using `trigger_workflow_run` — it sets the labels for you.)
 - **Validation failures are permanent.** `ComponentValidationFailed` won't auto-retry — fix the spec and trigger a new run. `WorkflowPlaneNotFound` is transient and retried automatically.
-- **No MCP for SecretReference create/update.** Read-only via `list_secret_references`. Use `occ apply -f` for create.
+- **No MCP for SecretReference create/update.** Read-only via `list_secret_references`. Hand creation off to `openchoreo-platform-engineer`.
 - **Buildah builds fail on multi-platform Dockerfiles.** Third-party Dockerfiles using `ARG BUILDPLATFORM` typically exit 125 with a `BUILDPLATFORM` error. For third-party apps, prefer BYOI — see `recipes/deploy-prebuilt-image.md`.
 - **Auto-build needs PE-side webhook setup.** Setting `autoBuild: true` alone isn't enough — pushes won't trigger builds without the webhook receiver. Escalate if it isn't working.
 

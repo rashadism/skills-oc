@@ -1,6 +1,6 @@
 # OpenChoreo Concepts
 
-OpenChoreo is an open-source Internal Developer Platform (IDP) built on Kubernetes. Developers interact through the `occ` CLI (or MCP tools) and never need direct cluster access. The platform abstracts away Kubernetes complexity while platform engineers control what's available.
+OpenChoreo is an open-source Internal Developer Platform (IDP) built on Kubernetes. Developers interact through the two OpenChoreo MCP servers — `openchoreo-cp` (control plane) and `openchoreo-obs` (observability) — and never need direct cluster access. The platform abstracts away Kubernetes complexity while platform engineers control what's available.
 
 ## Resource Hierarchy
 
@@ -52,7 +52,7 @@ A deployable unit. References a ComponentType that defines how it's deployed. Th
 The runtime contract. Defines what image to run, what ports to expose, and what services to connect to.
 
 **How it gets created**:
-- **BYO image** (Component has no `spec.workflow`): the developer creates it explicitly via `create_workload` MCP / `occ workload create` / `occ apply -f`.
+- **BYO image** (Component has no `spec.workflow`): the developer creates it explicitly via `create_workload`.
 - **Source build** (Component has `spec.workflow`): the build's `generate-workload` step **auto-generates it**. The workload is always named `{component}-workload` — the build overrides any `metadata.name` from the descriptor. The build inlines `workload.yaml` from the source repo if present; otherwise the workload contains only the container image.
 
 **Key fields**:
@@ -63,11 +63,11 @@ The runtime contract. Defines what image to run, what ports to expose, and what 
 ### Workload Descriptor
 A `workload.yaml` file placed in your source repository — **the developer's source of truth** for the source-build component's runtime contract: endpoints, dependencies, env vars, file mounts, schemas. Hand-maintained, not auto-generated.
 
-The build's `generate-workload` step runs `occ workload create --descriptor workload.yaml` and produces the Workload CR from it. Without `workload.yaml`, the auto-generated Workload contains only the image and has no routing.
+The build's `generate-workload` step reads `workload.yaml` and emits a Workload CR (image + descriptor). Without `workload.yaml`, the auto-generated Workload contains only the image and has no routing. (This step runs inside the build pipeline — developers don't invoke it directly.)
 
 **Placement**: Must be at the root of the `appPath` directory. If `appPath` is `/backend`, place it at `/backend/workload.yaml`. Not the docker context root, not the repo root (unless `appPath` is `.`).
 
-**Preferred enrichment path**: edit `workload.yaml` in the repo, commit, rebuild. The new workload spec flows through the build. Reach for `update_workload` MCP only when rebuilding isn't possible.
+**Preferred enrichment path**: edit `workload.yaml` in the repo, commit, rebuild. The new workload spec flows through the build. Reach for `update_workload` only when rebuilding isn't possible.
 
 For the full descriptor schema and source-build flow, see `openchoreo-developer/references/deployment-guide.md`.
 
@@ -81,7 +81,7 @@ Controls who can reach your service:
 The northbound gateway for external traffic is typically set up. The westbound gateway for internal/namespace traffic may not be. If you need internal visibility and get rendering errors, it's likely because the westbound gateway isn't configured. Escalate to platform engineering.
 
 ### ComponentType
-Platform-engineer-defined template that controls how a component deploys. Developers pick from available types and fill in the schema. View available types with `occ clustercomponenttype list` and inspect one with `occ clustercomponenttype get <name>`.
+Platform-engineer-defined template that controls how a component deploys. Developers pick from available types and fill in the schema. View available types with `list_cluster_component_types` and inspect one with `get_cluster_component_type` / `get_cluster_component_type_schema`.
 
 **Workload types**: `deployment`, `statefulset`, `cronjob`, `job`, `proxy`
 
@@ -96,12 +96,12 @@ Composable capability attached to components. Adds resources (like PVCs) or modi
 
 Each trait instance on a component needs a unique `instanceName`. This lets you attach the same trait type multiple times with different configs (e.g., two different persistent volumes).
 
-View available traits: `occ clustertrait list`, `occ trait list`. Inspect: `occ clustertrait get <name>`.
+View available traits: `list_cluster_traits`, `list_traits`. Inspect: `get_cluster_trait` / `get_cluster_trait_schema`.
 
 **Common traits**: persistent-volume, ingress, autoscaling, resource-limits.
 
 ### Environment
-A deployment target (dev, staging, prod). Maps to a DataPlane (Kubernetes cluster). View with `occ environment list`.
+A deployment target (dev, staging, prod). Maps to a DataPlane (Kubernetes cluster). View with `list_environments`.
 
 ### DeploymentPipeline
 Defines promotion paths between environments. A pipeline might be: development → staging → production.
@@ -122,7 +122,7 @@ deploymentPipelineRef: default
 ```
 
 ### ComponentRelease
-Immutable snapshot of Component + Workload + ComponentType + Traits at a point in time. Like a lock file for deployments. Created automatically when `autoDeploy: true`, or manually with `occ component deploy`.
+Immutable snapshot of Component + Workload + ComponentType + Traits at a point in time. Like a lock file for deployments. Created automatically when `autoDeploy: true`, or manually by binding a release to an environment via `create_release_binding`.
 
 ### ReleaseBinding
 Binds a ComponentRelease to an Environment. This is what triggers actual deployment. Supports environment-specific overrides:
@@ -134,7 +134,7 @@ Binds a ComponentRelease to an Environment. This is what triggers actual deploym
 ### Workflow / WorkflowRun
 Workflow is a build template defined by platform engineers (backed by Argo Workflows). WorkflowRun is an execution. Component workflows build container images from source; standalone workflows handle automation like migrations.
 
-**How CI builds work**: When you trigger a build, the workflow clones your repo, builds the image, then runs `occ workload create` with your `workload.yaml` descriptor to produce a Workload CR. The controller picks this up and creates/updates the Workload resource. If `autoDeploy` is on, this automatically triggers a new release and deployment. See `openchoreo-developer/references/deployment-guide.md` for the full pipeline flow.
+**How CI builds work**: When you trigger a build (`trigger_workflow_run`), the workflow clones your repo, builds the image, then generates a Workload CR from your `workload.yaml` descriptor (or just the image if no descriptor exists). The controller picks this up and creates/updates the Workload resource. If `autoDeploy` is on, this automatically triggers a new release and deployment. See `openchoreo-developer/references/deployment-guide.md` for the full pipeline flow.
 
 **Why workload.yaml exists**: A Dockerfile only describes how to build an image. It doesn't tell the platform what ports your app listens on, what protocol it speaks, or what other services it connects to. The `workload.yaml` descriptor fills this gap, declaring your app's runtime contract so the platform can generate the right routing, network policies, and service discovery.
 

@@ -2,8 +2,6 @@
 
 Add or change endpoints, environment variables, config files, and traits on a Component / Workload after the initial deploy. Most fields live on the Workload (`spec.container`, `spec.endpoints`); traits attach to the Component (`spec.traits[]`).
 
-> **Tool surface preference: MCP first, `occ` CLI as fallback.** Same as every recipe in this skill.
-
 ## When to use
 
 - The deployed Component needs more env vars, config files, ports, or endpoints
@@ -17,12 +15,12 @@ Add or change endpoints, environment variables, config files, and traits on a Co
 
 A Component and Workload already exist. If not, see `recipes/deploy-prebuilt-image.md` or `recipes/build-from-source.md` first.
 
-## Recipe — MCP (preferred)
+## Recipe
 
 ### 1. Read the current Workload
 
 ```
-mcp__openchoreo-cp__get_workload
+get_workload
   namespace_name: default
   workload_name: greeter-workload
 ```
@@ -30,7 +28,7 @@ mcp__openchoreo-cp__get_workload
 If unsure of the spec shape:
 
 ```
-mcp__openchoreo-cp__get_workload_schema
+get_workload_schema
   (no parameters)
 ```
 
@@ -39,7 +37,7 @@ mcp__openchoreo-cp__get_workload_schema
 Edit the spec locally, then send the full updated `workload_spec`:
 
 ```
-mcp__openchoreo-cp__update_workload
+update_workload
   namespace_name: default
   workload_name: greeter-workload
   workload_spec:
@@ -80,52 +78,27 @@ A new ComponentRelease is generated automatically; `auto_deploy: true` (set on t
 
 ### 3. Attach a Trait to the Component
 
-There is no MCP tool to update a Component's `spec.traits[]`. Trait attachment goes through `occ apply -f` against an updated Component YAML — see the CLI fallback section.
+**No MCP write surface for `spec.traits[]` attachment** — `patch_component` does not cover trait edits. Hand off to `openchoreo-platform-engineer` to apply an updated Component spec with the new trait entry.
 
-For trait *parameter* overrides per environment (without changing the Component itself), use `update_release_binding` with `trait_environment_configs` — see `recipes/override-per-environment.md`.
+For trait *parameter* overrides per environment (without changing the Component itself), use `update_release_binding` with `trait_environment_configs` — see `recipes/override-per-environment.md`. That stays in this skill.
 
 To discover available traits before attaching:
 
 ```
-mcp__openchoreo-cp__list_cluster_traits
-mcp__openchoreo-cp__get_cluster_trait_schema
+list_cluster_traits
+get_cluster_trait_schema
   ct_name: observability-alert-rule
 ```
 
 ### 4. Verify
 
 ```
-mcp__openchoreo-cp__get_release_binding
+get_release_binding
   namespace_name: default
   binding_name: <name from list_release_bindings>
 ```
 
 Check `status.conditions[]` for `Ready: True`, `Deployed: True`, `Synced: True`. For runtime logs, see `recipes/inspect-and-debug.md`.
-
-## Recipe — `occ` CLI (fallback)
-
-### 1. Read the current spec
-
-```bash
-occ workload get greeter-workload --namespace default
-occ component get greeter --namespace default
-```
-
-### 2. Edit and apply
-
-Edit the YAML locally, then:
-
-```bash
-occ apply -f /tmp/workload.yaml
-occ apply -f /tmp/component.yaml      # if attaching a Trait or changing ComponentType
-```
-
-### 3. Verify
-
-```bash
-occ releasebinding list --namespace default --project default --component greeter
-occ component logs greeter --namespace default
-```
 
 ## Configuration patterns
 
@@ -172,6 +145,8 @@ Each entry needs **exactly one** of `value` or `valueFrom`. For SecretReference 
 
 ### Configuration files
 
+In a Workload CR (sent via `update_workload`):
+
 ```yaml
 container:
   files:
@@ -186,13 +161,9 @@ container:
         secretKeyRef:                               # from SecretReference
           name: tls-certs
           key: certificate
-    - key: app.conf
-      mountPath: /etc/app
-      valueFrom:
-        path: configs/app.conf                      # source-build only — file in repo, relative to workload.yaml
 ```
 
-`valueFrom.path` is build-time only — applies when the source-build flow generates the Workload from `workload.yaml` in the repo. It does not work for BYOI Workloads (the runtime has no access to the repo).
+> **Field naming differs between Workload CR and `workload.yaml` descriptor.** The Workload CR (this recipe's MCP path) uses `container.env[]` / `container.files[]` with `key:`. The `workload.yaml` descriptor in the source repo uses `configurations.env[]` / `configurations.files[]` with `name:` instead of `key:`. The descriptor also supports `valueFrom.path: <repo-relative path>` to inline a file from the repo at build time — that's descriptor-only; the runtime Workload CR has no repo access.
 
 ### Resources and replicas
 
@@ -207,7 +178,7 @@ spec:
       limits:   {cpu: 500m, memory: 512Mi}
 ```
 
-The exact parameter set depends on the ClusterComponentType — discover with `mcp__openchoreo-cp__get_cluster_component_type_schema cct_name: deployment/service`.
+The exact parameter set depends on the ClusterComponentType — discover with `get_cluster_component_type_schema cct_name: deployment/service`.
 
 For per-environment differences (more replicas in prod), override at the ReleaseBinding level — see `recipes/override-per-environment.md`.
 
@@ -225,7 +196,7 @@ spec:
         condition: {window: 5m, operator: gt, threshold: 50}
 ```
 
-Discover available traits via `mcp__openchoreo-cp__list_cluster_traits`. Get a trait's parameter schema via `mcp__openchoreo-cp__get_cluster_trait_schema`.
+Discover available traits via `list_cluster_traits`. Get a trait's parameter schema via `get_cluster_trait_schema`.
 
 For the `observability-alert-rule` trait specifically, see `recipes/attach-alerts.md`.
 
@@ -233,9 +204,10 @@ For the `observability-alert-rule` trait specifically, see `recipes/attach-alert
 
 - **`update_workload` sends the full spec, not a partial patch.** Always `get_workload` first, modify locally, send the complete `workload_spec`. Omitting a field deletes it.
 - **`env` and `files` entries need exactly one of `value` or `valueFrom`** — not both, not neither. Validation fails otherwise.
-- **`valueFrom.path` only works in source-build `workload.yaml`** at build time. For BYOI, use literal `value` or `valueFrom.secretKeyRef`.
+- **Workload CR uses `key:`; `workload.yaml` descriptor uses `name:`** under `configurations.env[]` / `configurations.files[]`. Easy to mix up when copy-pasting between recipes.
+- **`valueFrom.path` only works in source-build `workload.yaml`** at build time. For Workload CRs (BYOI or post-build update via MCP), use literal `value` or `valueFrom.secretKeyRef`.
 - **`componentType.kind` and `traits[].kind` default wrong.** Both default to namespace-scoped (`ComponentType` / `Trait`). Built-ins are cluster-scoped (`ClusterComponentType` / `ClusterTrait`). Always set `kind` explicitly.
-- **No MCP tool for Component updates.** Trait attachment, ComponentType changes, and `parameters` edits go through `occ apply -f` against an updated Component YAML.
+- **No MCP write surface for Component trait attachment / ComponentType changes / `spec.parameters` edits.** Hand those off to `openchoreo-platform-engineer`.
 - **Visibility on a dependency must be ≤ visibility on the target endpoint.** A consumer asking for `namespace` visibility against a target that only declares `project` visibility fails. See `recipes/connect-components.md` for the dependency rules.
 - **Updating the Workload triggers a new ComponentRelease and (if `auto_deploy: true`) redeploys to the first environment.** Subsequent environments are not promoted automatically — see `recipes/deploy-and-promote.md`.
 

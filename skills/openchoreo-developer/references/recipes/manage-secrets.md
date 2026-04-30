@@ -2,7 +2,7 @@
 
 Create a `SecretReference` that pulls a secret from the platform's external secret store (ESO-backed: Vault, AWS Secrets Manager, OpenBao, …) and consume it in a Workload — as an env var, as a mounted file, or as Git auth for a source build.
 
-> **Tool surface preference: MCP first, `occ` CLI as fallback.** SecretReference create/update/delete are CLI-only — there is no MCP write surface for secrets.
+> **SecretReference create/update/delete is a known MCP gap.** No MCP write surface exists for SecretReference today. The developer authors the spec; the actual create lives in `openchoreo-platform-engineer`. From this skill you can read (`list_secret_references`) and consume (via `secretKeyRef` in a Workload spec).
 
 ## When to use
 
@@ -17,13 +17,13 @@ A `ClusterSecretStore` exists in the workflow plane and points at the external b
 To check what's available now:
 
 ```
-mcp__openchoreo-cp__list_secret_references
+list_secret_references
   namespace_name: default
 ```
 
-## Recipe — create a SecretReference (CLI only)
+## Recipe — author a SecretReference, hand off to PE for apply
 
-There is no MCP tool for `create_secret_reference` / `update_secret_reference` / `delete_secret_reference`. Use `occ apply -f`.
+`create_secret_reference` / `update_secret_reference` / `delete_secret_reference` do not exist in MCP. From this skill, draft the YAML and hand off to `openchoreo-platform-engineer` to apply it.
 
 ### 1. Author the YAML
 
@@ -54,28 +54,22 @@ Each entry maps one field in the remote secret to one key in the local Secret.
 
 `refreshInterval` defaults to `1h` — how often the controller resyncs from the backend. Lower for faster rotation; higher for less load.
 
-### 2. Apply
+### 2. Hand off to platform-engineer skill for apply
 
-```bash
-occ apply -f /tmp/secret-reference.yaml
-```
+Activate `openchoreo-platform-engineer` with the authored YAML — that skill has the surface to apply it.
 
 ### 3. Verify it synced
 
 ```
-mcp__openchoreo-cp__list_secret_references
+list_secret_references
   namespace_name: default
 ```
 
-```bash
-occ secretreference get <name> --namespace default
-```
-
-If `status` shows it's not synced, the cause is usually a wrong `remoteRef.key`/`property` or the ClusterSecretStore being misconfigured (PE side).
+If `status` on the returned resource shows it's not synced, the cause is usually a wrong `remoteRef.key`/`property` or the ClusterSecretStore being misconfigured (PE side).
 
 ## Recipe — consume a secret in a Workload
 
-Once the SecretReference exists, reference it from the Workload's `container.env[]` or `container.files[]`. Use `update_workload` (MCP) or edit the Workload YAML and `occ apply -f`.
+Once the SecretReference exists, reference it from the Workload's `container.env[]` or `container.files[]` via `update_workload`.
 
 ### Env var from a secret
 
@@ -166,7 +160,7 @@ spec:
 
 ## Gotchas
 
-- **No MCP for SecretReference write.** `create_secret_reference`, `update_secret_reference`, and `delete_secret_reference` do not exist. List-only via `list_secret_references`. Use `occ apply -f` for create/update.
+- **No MCP for SecretReference write.** `create_secret_reference`, `update_secret_reference`, and `delete_secret_reference` do not exist. List-only via `list_secret_references`. Hand creation off to `openchoreo-platform-engineer`.
 - **`remoteRef.key` is the path in the external store, not the Kubernetes name.** Different backends format the path differently (Vault: `secret/data/foo`, AWS: ARN, OpenBao: `secret/foo`). Match what the PE configured.
 - **`remoteRef.property` is optional but usually needed.** Without it, the entire remote secret is fetched into one field. Most secrets have multiple fields; pick the one you want via `property`.
 - **`template.type` matters for downstream consumers.** Private Git wants `basic-auth` or `ssh-auth`; private registry wants `dockerconfigjson`. Generic env-var consumption works with `Opaque`.
