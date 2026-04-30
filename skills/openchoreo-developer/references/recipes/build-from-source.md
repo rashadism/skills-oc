@@ -110,16 +110,7 @@ get_workflow_run
 
 Check `status.conditions` for `WorkflowSucceeded` / `WorkflowFailed`, and `status.tasks[]` for per-step phase (`Pending`, `Running`, `Succeeded`, `Failed`, `Skipped`, `Error`). Standard task names: `checkout-source`, `containerfile-build` (or builder-specific), `publish-image`, `generate-workload-cr`.
 
-For build logs:
-
-```
-query_workflow_logs
-  namespace: default
-  workflow_run_name: <run name>
-  task_name: <e.g. containerfile-build — omit to fetch all tasks>
-  start_time: <RFC3339>
-  end_time:   <RFC3339>
-```
+For build logs: tail `get_workflow_run_logs` while the run is in progress (optionally filter by `task`, optionally bound with `since_seconds`). Pair it with `get_workflow_run_events` if a task pod is stuck pending or failed to start. For *completed* failed runs, the live-log endpoint returns nothing — escalate to PE for `kubectl logs --previous` against the Argo pod, or rely on `get_workflow_run.status.conditions` and per-task phase to localize the failure.
 
 ### 6. Verify the deploy
 
@@ -129,42 +120,10 @@ After `WorkflowSucceeded`, the generated Workload triggers an auto-deploy (becau
 get_component
 list_release_bindings
 get_release_binding
-query_component_logs    # runtime logs once Ready
+get_resource_events / get_resource_logs    # pod-level events and runtime logs once Ready
 ```
 
 See `recipes/inspect-and-debug.md` for deeper inspection.
-
-## Variant: private Git repository
-
-The build needs Git credentials. The platform must have a ClusterSecretStore wired to a backend (Vault / AWS Secrets Manager / OpenBao) — that's a PE-side prerequisite. Once that's in place, the developer:
-
-### 1. Create a SecretReference
-
-**No MCP write surface for SecretReference.** Hand off to `openchoreo-platform-engineer` to apply a SecretReference based on `assets/secret-reference-git.yaml` (filling in `<SECRET_NAME>` and the secret backend path).
-
-Once the resource exists, verify it from this skill:
-
-```
-list_secret_references
-  namespace_name: default
-```
-
-### 2. Reference it from the Component's workflow
-
-Add `secretRef` under `repository`:
-
-```yaml
-workflow:
-  parameters:
-    repository:
-      url: https://github.com/<org>/<private-repo>
-      secretRef: <SECRET_NAME>
-      revision:
-        branch: main
-      appPath: /
-```
-
-For SSH-based auth, use a Git URL with `git@github.com:...` and a SecretReference of type `kubernetes.io/ssh-auth` instead of `basic-auth`.
 
 ## Variant: auto-build on push
 
@@ -201,9 +160,10 @@ If all three match, the platform creates a WorkflowRun automatically with the co
 - **WorkflowRuns are imperative, not declarative.** Each one starts a build. Do not commit WorkflowRun YAML to a GitOps repo — it'll trigger duplicate builds on every reconcile.
 - **Required labels on a manual WorkflowRun YAML:** `openchoreo.dev/project` and `openchoreo.dev/component`. Missing them fails with `ComponentValidationFailed`. (Not an issue when using `trigger_workflow_run` — it sets the labels for you.)
 - **Validation failures are permanent.** `ComponentValidationFailed` won't auto-retry — fix the spec and trigger a new run. `WorkflowPlaneNotFound` is transient and retried automatically.
-- **No MCP for SecretReference create/update.** Read-only via `list_secret_references`. Hand creation off to `openchoreo-platform-engineer`.
 - **Buildah builds fail on multi-platform Dockerfiles.** Third-party Dockerfiles using `ARG BUILDPLATFORM` typically exit 125 with a `BUILDPLATFORM` error. For third-party apps, prefer BYOI — see `recipes/deploy-prebuilt-image.md`.
 - **Auto-build needs PE-side webhook setup.** Setting `autoBuild: true` alone isn't enough — pushes won't trigger builds without the webhook receiver. Escalate if it isn't working.
+- **`trigger_workflow_run` vs `create_workflow_run`.** `trigger_workflow_run` starts a build using the component's configured workflow (optional `commit` SHA pins a revision). `create_workflow_run` creates a standalone run by workflow name with explicit parameters — use that for workflows that aren't tied to a component.
+- **Workflow runs can lag.** A just-triggered run may briefly show no runs. Call `list_workflow_runs` after a moment, then verify with `get_component`.
 
 ## Related recipes
 

@@ -2,8 +2,6 @@
 
 Create a `SecretReference` that pulls a secret from the platform's external secret store (ESO-backed: Vault, AWS Secrets Manager, OpenBao, …) and consume it in a Workload — as an env var, as a mounted file, or as Git auth for a source build.
 
-> **SecretReference create/update/delete is a known MCP gap.** No MCP write surface exists for SecretReference today. The developer authors the spec; the actual create lives in `openchoreo-platform-engineer`. From this skill you can read (`list_secret_references`) and consume (via `secretKeyRef` in a Workload spec).
-
 ## When to use
 
 - The Workload needs a credential (DB password, API key, token, TLS cert, vendor secret) that should not live in Git
@@ -21,13 +19,11 @@ list_secret_references
   namespace_name: default
 ```
 
-## Recipe — author a SecretReference, hand off to PE for apply
+## Recipe — create a SecretReference
 
-`create_secret_reference` / `update_secret_reference` / `delete_secret_reference` do not exist in MCP. From this skill, draft the YAML and hand off to `openchoreo-platform-engineer` to apply it.
+### 1. Compose the spec
 
-### 1. Author the YAML
-
-Copy `assets/secret-reference.yaml` and edit. The `template.type` field controls how the resulting Kubernetes Secret is shaped:
+The `template.type` field controls how the resulting Kubernetes Secret is shaped:
 
 | `template.type` | Use case |
 |---|---|
@@ -54,9 +50,9 @@ Each entry maps one field in the remote secret to one key in the local Secret.
 
 `refreshInterval` defaults to `1h` — how often the controller resyncs from the backend. Lower for faster rotation; higher for less load.
 
-### 2. Hand off to platform-engineer skill for apply
+### 2. Apply via MCP
 
-Activate `openchoreo-platform-engineer` with the authored YAML — that skill has the surface to apply it.
+Send the spec through the SecretReference create MCP path. For an existing reference, use the corresponding update path (read current spec via `list_secret_references` / `get_secret_reference`, modify, write back).
 
 ### 3. Verify it synced
 
@@ -160,7 +156,6 @@ spec:
 
 ## Gotchas
 
-- **No MCP for SecretReference write.** `create_secret_reference`, `update_secret_reference`, and `delete_secret_reference` do not exist. List-only via `list_secret_references`. Hand creation off to `openchoreo-platform-engineer`.
 - **`remoteRef.key` is the path in the external store, not the Kubernetes name.** Different backends format the path differently (Vault: `secret/data/foo`, AWS: ARN, OpenBao: `secret/foo`). Match what the PE configured.
 - **`remoteRef.property` is optional but usually needed.** Without it, the entire remote secret is fetched into one field. Most secrets have multiple fields; pick the one you want via `property`.
 - **`template.type` matters for downstream consumers.** Private Git wants `basic-auth` or `ssh-auth`; private registry wants `dockerconfigjson`. Generic env-var consumption works with `Opaque`.

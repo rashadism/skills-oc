@@ -70,18 +70,24 @@ OpenChoreo injects `USER_SERVICE_URL` (and any other env vars in `envBindings`) 
 
 ### 3. Verify after redeploy
 
-Once the redeploy is `Ready`, fetch runtime logs and confirm the env var resolves:
+Once the redeploy is `Ready`, fetch runtime logs and confirm the env var resolves. Find the pod name first, then read its container logs:
 
 ```
-query_component_logs
-  namespace: default
-  component: frontend
-  start_time: <RFC3339>
-  end_time: <RFC3339>
-  search_phrase: USER_SERVICE_URL
+get_resource_events
+  namespace_name: default
+  release_binding_name: frontend-development
+  group: ""
+  version: v1
+  kind: Pod
+  resource_name: frontend            # the workload's pod prefix; events surface concrete pod names
+
+get_resource_logs
+  namespace_name: default
+  release_binding_name: frontend-development
+  pod_name: <pod from events above>
 ```
 
-For deeper inspection, see `recipes/inspect-and-debug.md`.
+Look for `USER_SERVICE_URL` in startup logs or grep against the printed env. For deeper inspection, see `recipes/inspect-and-debug.md`.
 
 ## Patterns
 

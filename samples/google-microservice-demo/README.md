@@ -22,7 +22,7 @@ This sample shows how to deploy the [Google Cloud Platform Online Boutique (micr
 | Requirement | Notes |
 |---|---|
 | Claude Code with skills loaded | Both `openchoreo-developer` and `openchoreo-platform-engineer` from this repo |
-| `openchoreo-cp` MCP server registered | See [MCP configuration guide](https://openchoreo.dev/docs/reference/mcp-servers/mcp-ai-configuration/) |
+| `openchoreo-cp` MCP server registered | See [MCP configuration guide](https://openchoreo.dev/docs/ai/mcp-servers/) |
 | OpenChoreo v0.17 cluster | With at least one DataPlane, `development` environment, and the `service` / `web-application` / `worker` ComponentTypes registered |
 | Access to the OpenChoreo REST API | Optional fallback; `create_workload` MCP tool is now fixed in current versions |
 

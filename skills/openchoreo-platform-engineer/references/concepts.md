@@ -1,6 +1,6 @@
 # OpenChoreo Concepts
 
-OpenChoreo is an open-source Internal Developer Platform (IDP) built on Kubernetes. Both developers and platform engineers interact primarily through the OpenChoreo MCP servers (`openchoreo-cp` for control plane, `openchoreo-obs` for observability). Platform engineers fall back to `kubectl` for resources without an MCP write surface and for plane-internal CRDs and controller logs; developers stay in MCP and don't need direct cluster access.
+OpenChoreo is an open-source Internal Developer Platform (IDP) built on Kubernetes. Both developers and platform engineers interact primarily through the control-plane MCP server (`openchoreo-cp`). For build logs, longer-horizon log history, metrics, traces, alerts, or incidents, platform engineers drop to `kubectl logs` against the appropriate plane (workflow plane for Argo build pods, observability plane for fluent-bit / OpenSearch / observer). Platform engineers also fall back to `kubectl` for resources without an MCP write surface and for plane-internal CRDs and controller logs; developers stay in MCP and don't need direct cluster access.
 
 ## Resource Hierarchy
 

@@ -36,7 +36,7 @@ npx skills add rashadism/skills-oc --skill openchoreo-developer -g -y
 
 Then configure the OpenChoreo MCP servers (control plane + observer) per the official guide:
 
-**https://openchoreo.dev/docs/reference/mcp-servers/mcp-ai-configuration/**
+**https://openchoreo.dev/docs/ai/mcp-servers/**
 
 | Server | Tool prefix | Purpose |
 |---|---|---|

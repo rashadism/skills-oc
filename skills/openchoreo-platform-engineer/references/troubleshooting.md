@@ -31,10 +31,9 @@ get_resource_events                          → K8s events on Deployment / Pod 
                                                 (image pull errors, scheduling failures, OOM)
 get_resource_logs                            → raw container logs for a specific pod under a binding
                                                 (crashloops, startup failures)
-
-query_component_logs                         → observer-store runtime logs (filter, search, time range)
-query_workflow_logs                          → build / workflow run logs
 ```
+
+> For longer-horizon log/metric/trace history, alerts, or incidents, drop to `kubectl logs` against the appropriate plane (see the kubectl path below). Build logs go through MCP — `get_workflow_run_logs` (live) and `get_workflow_run_events` for the same run.
 
 ### Health check — kubectl path (cluster pods, controllers, raw CRDs)
 
@@ -55,7 +54,6 @@ kubectl get <crd> -A
 |-----------|-----------|---------------|
 | Controller Manager | `openchoreo-control-plane` | `kubectl logs deployment/controller-manager -n openchoreo-control-plane` |
 | OpenChoreo API | `openchoreo-control-plane` | `kubectl logs deployment/openchoreo-api -n openchoreo-control-plane` |
-| Backstage | `openchoreo-control-plane` | `kubectl logs deployment/backstage -n openchoreo-control-plane` |
 | Cluster Gateway | `openchoreo-control-plane` | `kubectl logs deployment/cluster-gateway -n openchoreo-control-plane` |
 | Data Plane Agent | `openchoreo-data-plane` | `kubectl logs deployment/cluster-agent -n openchoreo-data-plane` |
 | Workflow Plane Agent | `openchoreo-workflow-plane` | `kubectl logs deployment/cluster-agent -n openchoreo-workflow-plane` |
@@ -88,16 +86,6 @@ Common causes:
 - OIDC misconfiguration (issuer mismatch, JWKS unreachable)
 - Authorization policy errors
 
-### Backstage issues
-
-```bash
-kubectl logs deployment/backstage -n openchoreo-control-plane --tail=100
-```
-
-Common causes:
-- OAuth callback URL mismatch
-- Backend secret not configured
-- Database migration failures
 
 ## Data Plane Issues
 
@@ -177,19 +165,28 @@ Common causes:
 ### Build failures
 
 ```
-# Follow build logs (MCP)
-query_workflow_logs                             → namespace + workflow_run_name + start_time/end_time
+# Identify which step failed (MCP)
 list_workflow_runs                              → find the run name first
 get_workflow_run <name>                         → status.conditions + per-task phases
+get_workflow_run_logs <run-name> [task=<step>] [since_seconds=N]
+                                                → live build log lines (live-only — nothing for completed runs)
+get_workflow_run_events <run-name> [task=<step>]
+                                                → K8s events for the run (scheduling, pod-startup failures)
+```
+
+```
+# Build log content — MCP first
+get_workflow_run_logs <run-name> [task=<step>] [since_seconds=N]
+                                                → live log lines from the run's task pods
+get_workflow_run_events <run-name> [task=<step>]
+                                                → K8s events (scheduling, image pull, pod startup)
 ```
 
 ```bash
-# Argo workflow pods (kubectl — these are upstream Argo CRs)
+# Completed-run fallback: the live-log endpoint returns nothing once a run finishes,
+# so for failed-and-finished runs drop to kubectl against the workflow plane.
 kubectl get pods -n openchoreo-workflow-plane -l workflows.argoproj.io/workflow
-kubectl logs <workflow-pod> -n openchoreo-workflow-plane -c main
-
-# Specific step
-kubectl logs <workflow-pod> -n openchoreo-workflow-plane -c <step-name>
+kubectl logs --previous <workflow-pod> -n openchoreo-workflow-plane -c <step-name>
 ```
 
 Common causes:

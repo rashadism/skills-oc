@@ -1,6 +1,6 @@
 # OpenChoreo Concepts
 
-OpenChoreo is an open-source Internal Developer Platform (IDP) built on Kubernetes. Developers interact through the two OpenChoreo MCP servers — `openchoreo-cp` (control plane) and `openchoreo-obs` (observability) — and never need direct cluster access. The platform abstracts away Kubernetes complexity while platform engineers control what's available.
+OpenChoreo is an open-source Internal Developer Platform (IDP) built on Kubernetes. Developers interact through the OpenChoreo control-plane MCP server (`openchoreo-cp`) and never need direct cluster access. Runtime evidence comes from the control-plane `get_resource_events` / `get_resource_logs` tools; for longer-horizon log/metric/trace history, escalate to the platform engineer. The platform abstracts away Kubernetes complexity while platform engineers control what's available.
 
 ## Resource Hierarchy
 
@@ -69,7 +69,7 @@ The build's `generate-workload` step reads `workload.yaml` and emits a Workload 
 
 **Preferred enrichment path**: edit `workload.yaml` in the repo, commit, rebuild. The new workload spec flows through the build. Reach for `update_workload` only when rebuilding isn't possible.
 
-For the full descriptor schema and source-build flow, see `openchoreo-developer/references/deployment-guide.md`.
+For the descriptor schema and source-build flow, see `./recipes/build-from-source.md`.
 
 ### Endpoint Visibility
 Controls who can reach your service. Declared as a *list* on each target endpoint (`endpoints.<name>.visibility: [...]`); every endpoint implicitly has `project`:
@@ -85,6 +85,8 @@ The northbound gateway for external traffic is typically set up. The westbound g
 
 ### ComponentType
 Platform-engineer-defined template that controls how a component deploys. Developers pick from available types and fill in the schema. View available types with `list_cluster_component_types` and inspect one with `get_cluster_component_type` / `get_cluster_component_type_schema`.
+
+**Component type format is `workloadType/typeName`** (e.g. `deployment/service`). Use `get_cluster_component_type_schema` to discover accepted values before setting `spec.componentType.name`.
 
 **Workload types**: `deployment`, `statefulset`, `cronjob`, `job`, `proxy`
 
@@ -137,7 +139,7 @@ Binds a ComponentRelease to an Environment. This is what triggers actual deploym
 ### Workflow / WorkflowRun
 Workflow is a build template defined by platform engineers (backed by Argo Workflows). WorkflowRun is an execution. Component workflows build container images from source; standalone workflows handle automation like migrations.
 
-**How CI builds work**: When you trigger a build (`trigger_workflow_run`), the workflow clones your repo, builds the image, then generates a Workload CR from your `workload.yaml` descriptor (or just the image if no descriptor exists). The controller picks this up and creates/updates the Workload resource. If `autoDeploy` is on, this automatically triggers a new release and deployment. See `openchoreo-developer/references/deployment-guide.md` for the full pipeline flow.
+**How CI builds work**: When you trigger a build (`trigger_workflow_run`), the workflow clones your repo, builds the image, then generates a Workload CR from your `workload.yaml` descriptor (or just the image if no descriptor exists). The controller picks this up and creates/updates the Workload resource. If `autoDeploy` is on, this automatically triggers a new release and deployment. See `./recipes/build-from-source.md` for the full pipeline flow.
 
 **Why workload.yaml exists**: A Dockerfile only describes how to build an image. It doesn't tell the platform what ports your app listens on, what protocol it speaks, or what other services it connects to. The `workload.yaml` descriptor fills this gap, declaring your app's runtime contract so the platform can generate the right routing, network policies, and service discovery.
 
@@ -197,3 +199,54 @@ dependencies:
 ```
 
 This injects `BACKEND_URL` with the resolved address. No hardcoded hostnames, no guessing service DNS names. Note that connections live under `dependencies.endpoints[]`, not directly under `dependencies[]`.
+
+**TCP `address` binding injects `host:port`, not a protocol DSN.** For databases (PostgreSQL, MySQL) and message brokers (NATS, Redis), the injected `address` value is a plain `host:port` string. Apps that expect `postgres://user:pass@host/db` or `nats://host:4222` will fail to parse it. Declare the dependency for the topology diagram but set the full DSN as a literal env var instead. Get the hostname from `get_release_binding` → `endpoints[*].serviceURL.host`.
+
+## Discovery-first workflow (per task)
+
+For any individual developer task, follow these four phases in order. They're encoded as the agent's working style in the SKILL.md and elaborated here.
+
+### 1. Inspect the repo and classify the app
+
+Start by understanding what is being deployed:
+
+- Services and runtimes
+- Dockerfiles and build system
+- ports, env vars, and inter-service dependencies
+- whether the app fits a simple image-based path or a source-build path
+
+Do not create or patch resources until the application shape is clear.
+
+### 2. Discover only what this task needs
+
+Use focused discovery via MCP instead of broad inventory:
+
+- existing project, component, or release binding when names are known (`get_component`, `get_release_binding`)
+- available ComponentTypes only if you need to create or change the type (`list_cluster_component_types`, `get_cluster_component_type_schema`)
+- available Workflows only if this is a source build (`list_cluster_workflows`, `get_cluster_workflow_schema`)
+- environments and deployment pipelines only if deployment or promotion depends on them (`list_environments`, `list_deployment_pipelines`)
+
+If the component already exists, inspect it (`get_component`, `get_workload`) before reauthoring.
+
+### 3. Fetch schemas before authoring resource specs
+
+Before writing a `workload_spec`, Component spec, or override payload, fetch the relevant schema:
+
+- `get_workload_schema`
+- `get_cluster_component_type_schema`
+- `get_cluster_trait_schema`
+
+For existing resources, read the current spec via `get_*` before sending an `update_*`. `update_workload` sends the full spec, not a partial patch — modifying locally then writing back is the canonical loop.
+
+### 4. Verify with live app evidence
+
+Use MCP to verify, in this order of specificity:
+
+- `get_component` — `status.conditions[]`
+- `get_release_binding` — per-environment readiness, deployed URLs
+- `get_resource_events` — pod-level events under a binding (restart counts, scheduling failures, OOM kills)
+- `get_resource_logs` — pod logs under a binding
+
+Trust deployed URLs and endpoint details from `ReleaseBinding.status.endpoints[]` rather than constructing them by hand.
+
+For deeper runtime queries — historical logs across replicas, metrics, traces, alerts, incidents — hand off per the developer skill's hand-off rule.

@@ -76,21 +76,7 @@ update_workload
 
 A new ComponentRelease is generated automatically; `auto_deploy: true` (set on the Component) triggers redeploy to the first environment.
 
-### 3. Attach a Trait to the Component
-
-**No MCP write surface for `spec.traits[]` attachment** — `patch_component` does not cover trait edits. Hand off to `openchoreo-platform-engineer` to apply an updated Component spec with the new trait entry.
-
-For trait *parameter* overrides per environment (without changing the Component itself), use `update_release_binding` with `trait_environment_configs` — see `recipes/override-per-environment.md`. That stays in this skill.
-
-To discover available traits before attaching:
-
-```
-list_cluster_traits
-get_cluster_trait_schema
-  ct_name: observability-alert-rule
-```
-
-### 4. Verify
+### 3. Verify
 
 ```
 get_release_binding
@@ -200,16 +186,16 @@ spec:
 
 Discover available traits via `list_cluster_traits`. Get a trait's parameter schema via `get_cluster_trait_schema`.
 
-For the `observability-alert-rule` trait specifically, see `recipes/attach-alerts.md`.
-
 ## Gotchas
 
 - **`update_workload` sends the full spec, not a partial patch.** Always `get_workload` first, modify locally, send the complete `workload_spec`. Omitting a field deletes it.
+- **`update_workload` only takes `namespace_name`, `workload_name`, `workload_spec`.** It does not accept `project_name` or `component_name`. Use `list_workloads` to find the workload name first.
+- **File mount `mountPath` is a directory.** The controller appends the `key` name to `mountPath` to form the final file path. Set `mountPath` to the parent directory (`/usr/share/nginx/html`), not the full file path (`/usr/share/nginx/html/config.json`). Using the full file path doubles the filename: `.../config.json/config.json`.
+- **Browser-facing apps need `https://` and `wss://` backend URLs.** OpenChoreo serves web-application components over HTTPS. Any backend URLs injected at runtime (e.g. via a mounted `config.json`) must use `https://` and `wss://` — HTTP/WS URLs are blocked by browsers as mixed content (no visible error, requests silently fail). Get external URLs from `get_release_binding` → `endpoints[*].externalURLs` and use the `https` scheme.
 - **`env` and `files` entries need exactly one of `value` or `valueFrom`** — not both, not neither. Validation fails otherwise.
 - **Workload CR uses `key:`; `workload.yaml` descriptor uses `name:`** under `configurations.env[]` / `configurations.files[]`. Easy to mix up when copy-pasting between recipes.
 - **`valueFrom.path` only works in source-build `workload.yaml`** at build time. For Workload CRs (BYOI or post-build update via MCP), use literal `value` or `valueFrom.secretKeyRef`.
 - **`componentType.kind` and `traits[].kind` default wrong.** Both default to namespace-scoped (`ComponentType` / `Trait`). Built-ins are cluster-scoped (`ClusterComponentType` / `ClusterTrait`). Always set `kind` explicitly.
-- **No MCP write surface for Component trait attachment / ComponentType changes / `spec.parameters` edits.** Hand those off to `openchoreo-platform-engineer`.
 - **Visibility on a dependency must be ≤ visibility on the target endpoint.** A consumer asking for `namespace` visibility against a target that only declares `project` visibility fails. See `recipes/connect-components.md` for the dependency rules.
 - **Updating the Workload triggers a new ComponentRelease and (if `auto_deploy: true`) redeploys to the first environment.** Subsequent environments are not promoted automatically — see `recipes/deploy-and-promote.md`.
 
@@ -220,5 +206,4 @@ For the `observability-alert-rule` trait specifically, see `recipes/attach-alert
 - [`connect-components.md`](connect-components.md) — endpoint dependencies
 - [`manage-secrets.md`](manage-secrets.md) — SecretReference patterns
 - [`override-per-environment.md`](override-per-environment.md) — per-env replicas / resources / traits / env
-- [`attach-alerts.md`](attach-alerts.md) — observability-alert-rule trait
 - [`inspect-and-debug.md`](inspect-and-debug.md) — verify the change took effect

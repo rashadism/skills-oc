@@ -22,7 +22,7 @@ This sample shows how to deploy [Doclet](https://github.com/lakwarus/doclet) —
 | Requirement | Notes |
 |---|---|
 | Claude Code with skills loaded | `openchoreo-developer` from this repo |
-| `openchoreo-cp` MCP server registered | See [MCP configuration guide](https://openchoreo.dev/docs/reference/mcp-servers/mcp-ai-configuration/) |
+| `openchoreo-cp` MCP server registered | See [MCP configuration guide](https://openchoreo.dev/docs/ai/mcp-servers/) |
 | OpenChoreo cluster | With a DataPlane, `development` environment, `deployment/service`, `deployment/web-application` ComponentTypes, and `dockerfile-builder` ClusterWorkflow |
 
 ---

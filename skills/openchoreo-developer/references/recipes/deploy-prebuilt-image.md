@@ -1,6 +1,6 @@
 # Deploy a pre-built image (BYOI)
 
-Deploy an existing container image — built elsewhere or pulled from a public/private registry — as a Component on OpenChoreo. No source build, no workflow.
+Deploy an existing container image — built elsewhere or pulled from a public registry — as a Component on OpenChoreo. No source build, no workflow.
 
 ## When to use
 
@@ -13,7 +13,7 @@ Deploy an existing container image — built elsewhere or pulled from a public/p
 
 1. The control-plane MCP server is configured and reachable (`list_namespaces` returns).
 2. A Project exists. The `default` project is created during install — confirm with `list_projects` (`namespace_name: default`). If you need a new one, see [Variant: create a Project](#variant-create-a-project) below.
-3. A ClusterComponentType matching the workload shape exists — discover with `list_cluster_component_types`. Common ones: `deployment/service`, `deployment/web-application`, `deployment/worker`, `cronjob/scheduled-task`.
+3. A ComponentType matching the workload shape exists. The platform may register either cluster-scoped (`ClusterComponentType`) or namespace-scoped (`ComponentType`) — **discover both** with `list_cluster_component_types` and `list_component_types`. Common cluster-scoped ones in default platform setups: `deployment/service`, `deployment/web-application`, `deployment/worker`, `cronjob/scheduled-task`. Set `componentType.kind` explicitly to match what you found.
 
 ## Recipe
 
@@ -87,17 +87,7 @@ get_release_binding
 
 The deployed URL is in `status.endpoints` of the ReleaseBinding — read it from there, do not construct it by hand.
 
-For runtime logs:
-
-```
-query_component_logs
-  namespace: default
-  component: greeter
-  start_time: <RFC3339, e.g. 2026-04-29T00:00:00Z>
-  end_time:   <RFC3339, e.g. 2026-04-29T01:00:00Z>
-```
-
-For deeper inspection (k8s artifacts, status conditions, crashloop debug), see `recipes/inspect-and-debug.md`.
+For runtime logs, status conditions, pod events, and crashloop debugging, see [`./inspect-and-debug.md`](./inspect-and-debug.md).
 
 ## Variant: create a Project
 
@@ -111,28 +101,7 @@ create_project
   deployment_pipeline: default              # optional, defaults to "default"
 ```
 
-> Deleting a Project deletes every Component inside it. There is no MCP `delete_project` tool — hard-delete needs `openchoreo-platform-engineer`. Confirm with the user before escalating.
-
 Then change `project_name` on your Component and Workload calls to the new project name.
-
-## Variant: pull from a private registry
-
-The developer-side input is identical — just point `image` at the private repo.
-
-```
-create_workload
-  ...
-  workload_spec:
-    container:
-      image: docker.io/<org>/<repo>:<tag>
-    ...
-```
-
-The auth itself is **PE-owned**, not a per-Component setting. The platform must:
-- store registry credentials in the secret backend (e.g. OpenBao);
-- have a `ClusterComponentType` whose template generates an `ExternalSecret` of type `kubernetes.io/dockerconfigjson` and references it from `spec.template.spec.imagePullSecrets`.
-
-If a private image fails with `ImagePullBackOff` after deploy, the platform side is missing one of those — escalate via `openchoreo-platform-engineer` rather than patching the Component.
 
 ## Gotchas
 

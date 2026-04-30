@@ -192,5 +192,4 @@ trait_environment_configs:
 - [`configure-workload.md`](configure-workload.md) — base Workload configuration (applies to every environment)
 - [`deploy-and-promote.md`](deploy-and-promote.md) — promotion creates the bindings you'll override
 - [`manage-secrets.md`](manage-secrets.md) — env-specific secrets pattern
-- [`attach-alerts.md`](attach-alerts.md) — `traitEnvironmentConfigs` for alert channels per env
 - [`inspect-and-debug.md`](inspect-and-debug.md) — verify the override took effect

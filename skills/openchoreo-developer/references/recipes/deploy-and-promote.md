@@ -115,15 +115,21 @@ update_release_binding
 
 ### Verify
 
-`status.conditions[]` flips through `Synced: False` while the new release rolls out, then back to `Synced: True`. Watch logs to confirm the older code is running:
+`status.conditions[]` flips through `Synced: False` while the new release rolls out, then back to `Synced: True`. Watch logs to confirm the older code is running. Find the new pod name via `get_resource_events`, then read its container logs:
 
 ```
-query_component_logs
-  namespace: default
-  component: my-service
-  environment: production
-  start_time: <RFC3339>
-  end_time:   <RFC3339>
+get_resource_events
+  namespace_name: default
+  release_binding_name: my-service-production
+  group: ""
+  version: v1
+  kind: Pod
+  resource_name: my-service
+
+get_resource_logs
+  namespace_name: default
+  release_binding_name: my-service-production
+  pod_name: <pod from events above>
 ```
 
 ## Variant — undeploy
@@ -159,7 +165,7 @@ The Deployment / Service / HTTPRoute come back with the binding's existing relea
 - **`create_release_binding` fails if a binding already exists for that environment.** To change the release in an existing binding, use `update_release_binding release_name: <new>`. The MCP tool description says this explicitly.
 - **Pipelines gate promotion paths.** If the pipeline only allows `dev → staging → prod`, you cannot skip from `dev → prod` directly. Override at the PE side or change the pipeline.
 - **Promoted bindings start without overrides.** Each environment's ReleaseBinding is independent — promotion creates a fresh binding for the new env. Re-apply per-environment overrides explicitly. See `recipes/override-per-environment.md`.
-- **`Undeploy` does not delete the binding.** It just removes the data-plane resources. The ReleaseBinding resource itself stays with all config intact, ready for a future redeploy. There is no MCP `delete_release_binding` tool — hard-delete needs `openchoreo-platform-engineer`.
+- **`Undeploy` does not delete the binding.** It just removes the data-plane resources. The ReleaseBinding resource itself stays with all config intact, ready for a future redeploy.
 - **Rollback only changes `release_name`** — env-specific overrides on the binding survive. If the older release expected different env vars, you may need to also update `workload_overrides` on the same call.
 - **`create_release_binding` requires all five of `namespace_name`, `project_name`, `component_name`, `environment`, `release_name`.** `release_name` is not optional. If `auto_deploy: true` and the Workload just changed, a fresh ComponentRelease is created automatically — find its name via `list_component_releases`.
 

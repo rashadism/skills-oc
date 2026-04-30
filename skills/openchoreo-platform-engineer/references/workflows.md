@@ -667,7 +667,10 @@ trigger_workflow_run                              → component-bound build (bui
 create_workflow_run                               → standalone run by workflow name with explicit parameters
 list_workflow_runs                                → run history
 get_workflow_run <name>                           → status.conditions, per-task phases
-query_workflow_logs                               → run logs (observer plane)
+get_workflow_run_logs <run-name>                  → live build log lines (optional task / since_seconds; live-only)
+get_workflow_run_events <run-name>                → K8s events for the run (scheduling, pod-startup failures)
+# live build logs via `get_workflow_run_logs`; kubectl is the completed-run fallback:
+#   kubectl logs --previous <workflow-pod> -n openchoreo-workflow-plane -c <step>
 ```
 
 ### `kubectl apply -f` fallback
@@ -683,7 +686,7 @@ kubectl get workflowrun                          # see runs
 kubectl get workflowrun <name> -o yaml           # status.conditions for failures
 ```
 
-For runs and logs, prefer MCP (`list_workflow_runs`, `get_workflow_run`, `query_workflow_logs`) — the observer plane is the right surface for build logs.
+For run metadata (status, per-task phase), prefer MCP (`list_workflow_runs`, `get_workflow_run`). For live build log lines, `get_workflow_run_logs <run-name>` is the primary MCP path (optional `task` filter, optional `since_seconds` bound). Pair with `get_workflow_run_events` for scheduling/pod-startup diagnostics. For completed-run failures whose live logs are gone, fall back to `kubectl logs --previous <workflow-pod> -n openchoreo-workflow-plane -c <step>`.
 
 ### kubectl for Argo CRDs
 

@@ -1,15 +1,14 @@
 # OpenChoreo MCP — Platform Engineer view
 
-PE-focused catalog for OpenChoreo's two MCP servers. Tools the developer skill rarely touches (ComponentType / Trait / Workflow CRUD, Environment / DeploymentPipeline writes, plane reads, ComponentRelease) are surfaced first.
+PE-focused catalog for OpenChoreo's control-plane MCP server. Tools the developer skill rarely touches (ComponentType / Trait / Workflow CRUD, Environment / DeploymentPipeline writes, plane reads, ComponentRelease) are surfaced first.
 
 | Server | Purpose |
 |---|---|
-| Control plane (`openchoreo-cp`) | Resource CRUD, schemas, workflows, releases |
-| Observability (`openchoreo-obs`) | Logs, metrics, traces, spans, alerts, incidents |
+| Control plane (`openchoreo-cp`) | Resource CRUD, schemas, workflows, releases, per-binding events and pod logs |
 
-Both must be configured separately; neither covers the other's surface.
+> For per-binding pod logs and events, use `get_resource_logs` / `get_resource_events` (control plane). For controller / plane / Argo / fluent-bit / OpenSearch logs, drop to `kubectl logs` against the appropriate plane namespace.
 
-> Tool names below are bare (e.g. `create_environment`). The actual callable name carries an agent-specific prefix wrapping the server name — Claude Code uses `mcp__openchoreo-cp__<tool>` and `mcp__openchoreo-obs__<tool>`. Apply whatever prefix your coding agent expects.
+> Tool names below are bare (e.g. `create_environment`). The actual callable name carries an agent-specific prefix wrapping the server name — Claude Code uses `mcp__openchoreo-cp__<tool>`. Apply whatever prefix your coding agent expects.
 
 ## What MCP can NOT do for you (use kubectl)
 
@@ -25,9 +24,9 @@ Both must be configured separately; neither covers the other's surface.
 | `Gateway` / `HTTPRoute` / `GatewayClass` (Kubernetes Gateway API) | not OpenChoreo | `kubectl` in DataPlane |
 | Helm install / upgrade for control plane / planes / cluster-agent | not in scope of MCP | `helm` |
 | Controller / cluster-gateway / cluster-agent log inspection | observer plane only handles app logs | `kubectl logs` per cluster |
-| Incident state changes (acknowledge, resolve, write RCA) | none | Backstage portal |
+| Incident state changes (acknowledge, resolve, write RCA) | none | not available from this skill — ask the user to handle out of band |
 
-These are not blockers — they're just two-step (`kubectl apply -f`) or out-of-band (Helm / Backstage). When the user asks for one of them, do the work via the right path and call out the gap if relevant.
+These are not blockers — they're just two-step (`kubectl apply -f`) or out-of-band (Helm or out-of-scope UI work). When the user asks for one of them, do the work via the right path and call out the gap if relevant.
 
 ## PE write surface (full CRUD via MCP)
 
@@ -128,6 +127,8 @@ PEs frequently look at developer-side resources to triage cross-skill issues. Th
 - `list_workloads` / `get_workload` / `get_workload_schema`
 - `list_release_bindings` / `get_release_binding` (status + endpoints)
 - `list_workflow_runs` / `get_workflow_run`
+- `get_workflow_run_logs` (live logs for a run; optional `task`, optional `since_seconds`; **live-only** — no archived logs for completed runs)
+- `get_workflow_run_events` (K8s events for a run; optional `task`; useful for scheduling and pod-startup failures)
 - `list_secret_references`
 
 For **modifying** developer-side resources, prefer pairing with `openchoreo-developer` (the developer skill is MCP-only and owns those workflows).
@@ -193,12 +194,12 @@ get_deployment_pipeline                 → verify
 get_component                          → spec + status.conditions
 get_release_binding                    → per-env state, endpoints, condition messages
 get_resource_events                    → K8s events on Deployment / Pod (image pull, scheduling, OOM)
-get_resource_logs                      → raw container logs for a specific pod
-query_component_logs                   → observer-store runtime logs (filter, search, time range)
-query_workflow_logs                    → build logs (workflow run name)
+get_resource_logs                      → raw container logs for a specific pod under a binding
 ```
 
-For platform-side failures (controller stuck, gateway misconfigured, agent disconnected), the observer plane will not have the logs. Drop to `kubectl logs` in the appropriate cluster — see `references/troubleshooting.md`.
+For longer-horizon log/metric/trace history, alerts, or incidents, use `kubectl logs` against the appropriate plane (fluent-bit / OpenSearch / observer in the observability plane for stored telemetry). Build logs have an MCP path — `get_workflow_run_logs` (live) and `get_workflow_run_events` for the same run. See `references/troubleshooting.md`.
+
+For platform-side failures (controller stuck, gateway misconfigured, agent disconnected), drop to `kubectl logs` in the appropriate cluster — see `references/troubleshooting.md`.
 
 ### 6. Inspect plane health
 
@@ -222,21 +223,15 @@ get_component <name>                    → check status.conditions for re-valid
 
 Existing Components don't auto-roll. They re-render at next reconcile, which usually happens on the next ReleaseBinding update. Trigger it explicitly via `update_release_binding` or wait for the next dev-side change.
 
-## Observability tool catalog (`openchoreo-obs`)
+## Logs and telemetry beyond MCP
 
-| Tool | Purpose |
-|---|---|
-| `query_component_logs` | Runtime logs for a component in a given environment |
-| `query_workflow_logs` | Build / workflow run logs (by run name + optional task name) |
-| `query_resource_metrics` | CPU and memory usage for a component |
-| `query_http_metrics` | HTTP request rate, latency, error rate (p50/p90/p99) |
-| `query_traces` | Search distributed traces for a component |
-| `query_trace_spans` | Spans within a trace |
-| `get_span_details` | Full attributes for one span |
-| `query_alerts` | Fired alerts (read-only) |
-| `query_incidents` | Incidents created from alerts (read-only — incident state changes are Backstage-only) |
+For per-binding pod logs and events, use `get_resource_logs` / `get_resource_events` (control plane). For longer-horizon log/metric/trace history, alerts, or incidents, use `kubectl logs` against the relevant plane:
 
-All require `namespace`, `start_time`, `end_time` (RFC3339). Optional: `project`, `component`, `environment`. If `component` is given, `project` is required. Default `sort_order: desc`, `limit: 100`.
+- Build logs — `get_workflow_run_logs <run-name>` (live; pair with `get_workflow_run_events` for scheduling/pod-startup issues). For *completed* failed runs the live-log endpoint returns nothing; fall back to `kubectl logs --previous <argo-pod> -n openchoreo-workflow-plane -c <step>`.
+- Application runtime logs (stored) — `kubectl logs deployment/observer -n openchoreo-observability-plane`, plus the OpenSearch / fluent-bit pods in that namespace if tracing the pipeline itself.
+- Alerts / incidents — `kubectl get observabilityalertrule -A` for rule presence; incident state changes are out of scope for this skill.
+
+See `references/troubleshooting.md` for the full pod-log map.
 
 ## Gotchas
 
@@ -252,8 +247,6 @@ All require `namespace`, `start_time`, `end_time` (RFC3339). Optional: `project`
 
 **`get_resource_events` parameters are exact-match.** Required: `namespace_name`, `release_binding_name`, `group`, `version`, `kind`, `resource_name`. For core resources, `group: ""`. Use `get_release_binding` first to discover the kind/name of the workload's Deployment / Pod.
 
-**`get_resource_logs` is direct kubectl-style logs.** It goes through the cluster gateway to the data plane, not through the observer store. Pod must currently exist; previous-container logs are not retrievable. For pods that are gone, use `query_component_logs` (observer-store).
+**`get_resource_logs` is direct kubectl-style logs.** It goes through the cluster gateway to the data plane, not through the observer store. Pod must currently exist; previous-container logs are not retrievable. For pods that are gone, fall back to `kubectl logs --previous` against the data-plane cluster directly.
 
-**Two separate MCP servers.** `openchoreo-cp` (control plane) and `openchoreo-obs` (observability). Both must be configured. Neither covers the other's surface.
-
-**Observability data requires a live ObservabilityPlane.** If queries return no data, the plane may be missing or unhealthy. Inspect via `get_observability_plane`.
+**ObservabilityPlane (the CRD) must be installed and healthy** for the in-cluster observability stack to ingest data. If `kubectl logs` against `observer` / `fluent-bit` / `opensearch` shows pipeline failures, inspect plane registration via `get_observability_plane` and `kubectl get observabilityplane <name> -o yaml`.

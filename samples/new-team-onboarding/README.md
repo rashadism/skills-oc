@@ -29,7 +29,7 @@ With OpenChoreo skills and the MCP server connected, a Platform Engineer describ
 | Requirement | Notes |
 |---|---|
 | Claude Code with skills loaded | `openchoreo-platform-engineer` from this repo |
-| `openchoreo-cp` MCP server registered | See [MCP configuration guide](https://openchoreo.dev/docs/reference/mcp-servers/mcp-ai-configuration/) |
+| `openchoreo-cp` MCP server registered | See [MCP configuration guide](https://openchoreo.dev/docs/ai/mcp-servers/) |
 | `occ` CLI installed and logged in | See [CLI installation guide](https://openchoreo.dev/docs/user-guide/cli-installation/) |
 | OpenChoreo v0.17+ cluster | With at least one DataPlane and a `default` namespace |
 
