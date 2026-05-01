@@ -35,6 +35,13 @@ get_resource_logs                            → raw container logs for a specif
 
 > For longer-horizon log/metric/trace history, alerts, or incidents, drop to `kubectl logs` against the appropriate plane (see the kubectl path below). Build logs go through MCP — `get_workflow_run_logs` (live) and `get_workflow_run_events` for the same run.
 
+### Diagnostic-tool gotchas
+
+- **`get_resource_events` parameters are exact-match.** Required: `namespace_name`, `release_binding_name`, `group`, `version`, `kind`, `resource_name`. For core resources, `group: ""`. Use `get_release_binding` first to discover the kind/name of the workload's Deployment / Pod.
+- **`get_resource_logs` is direct kubectl-style logs.** It goes through the cluster gateway to the data plane, not through the observer store. Pod must currently exist; previous-container logs are not retrievable. For pods that are gone, fall back to `kubectl logs --previous` against the data-plane cluster directly.
+- **`get_workflow_run_logs` is live-only.** Returns nothing once a run has finished. For *completed* failed runs, fall back to `kubectl logs --previous <argo-pod> -n openchoreo-workflow-plane -c <step>`. Pair `get_workflow_run_events` for scheduling / pod-startup diagnostics that don't need live container output.
+- **ObservabilityPlane (the CRD) must be installed and healthy** for the in-cluster observability stack to ingest data. If `kubectl logs` against `observer` / `fluent-bit` / `opensearch` shows pipeline failures, inspect plane registration via `get_observability_plane` and `kubectl get observabilityplane <name> -o yaml`.
+
 ### Health check — kubectl path (cluster pods, controllers, raw CRDs)
 
 ```bash

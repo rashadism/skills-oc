@@ -2,7 +2,7 @@
 
 This file is the authoring reference for **ComponentTypes**, **ClusterComponentTypes**, **Traits**, and **ClusterTraits** — the resources platform engineers create so developers have deployment templates and composable capabilities.
 
-For the CEL expressions used throughout, see `cel.md`. For Workflow authoring (build templates), see `workflows.md`. For the MCP catalog, see `mcp.md`.
+For the CEL expressions used throughout, see [`cel.md`](./cel.md). For Workflow authoring (build templates), see [`workflows.md`](./workflows.md). The full MCP tool list is discovered at runtime via the control-plane MCP server.
 
 **Tool surface for these resources:** MCP-first. `create_component_type` / `create_cluster_component_type` / `create_trait` / `create_cluster_trait` (and their `update_*` / `delete_*` counterparts) all exist. They take a full `spec` body — discover the spec shape via `get_component_type_creation_schema` / `get_trait_creation_schema`. `update_*` is **full-spec replacement**: read the current spec via `get_*` first, modify locally, send the whole spec back. For one-line CEL or template tweaks, `kubectl apply -f` against an edited YAML is often easier; both paths are equivalent.
 

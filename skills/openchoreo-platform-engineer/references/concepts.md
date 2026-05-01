@@ -194,3 +194,60 @@ dependencies:
 ```
 
 This injects `BACKEND_URL` with the resolved address. No hardcoded hostnames, no guessing service DNS names. Note that connections live under `dependencies.endpoints[]`, not directly under `dependencies[]`.
+
+## Discovery-first workflow (per task)
+
+For any individual platform task, follow these five phases in order. They're encoded as the agent's working style in `SKILL.md` and elaborated here.
+
+### 1. Classify the task
+
+Decide whether the work is:
+
+- Pure platform work (this skill alone)
+- App work that needs PE help (paired with `openchoreo-developer`)
+- A mixed task that needs both OpenChoreo skills
+
+For mixed tasks, keep the app-facing thread and the platform-facing thread connected. Many deployment failures are caused by an interaction between Component config and platform config.
+
+### 2. Inspect current state via MCP first
+
+Start with the smallest useful inspection:
+
+- `get_component` / `get_workload` / `get_release_binding` for app-facing resources (status conditions, endpoints).
+- `get_cluster_component_type` / `get_cluster_trait` / `get_cluster_workflow` for platform extensions.
+- `list_environments`, `list_deployment_pipelines`, plane reads (`list_dataplanes`, `get_dataplane`, etc.) for topology.
+- `get_resource_events` / `get_resource_logs` for pod-level debugging through a binding.
+
+Drop to `kubectl logs` only when MCP can't reach what you need — controller pods, cluster-gateway, cluster-agent, or pods outside any OpenChoreo binding.
+
+### 3. Fetch creation / resource schemas before authoring
+
+Before writing a `spec` body for a `create_*` call, fetch the relevant schema:
+
+- `get_component_type_creation_schema` / `get_cluster_component_type_creation_schema`
+- `get_trait_creation_schema`
+- `get_workload_schema`, `get_cluster_component_type_schema`, `get_cluster_trait_schema`, `get_cluster_workflow_schema` for inspecting existing-resource shape
+
+For existing resources, read the current spec via `get_*` before sending an `update_*`. **`update_component_type`, `update_trait`, `update_workflow` (and cluster variants) are full-spec replacement** — read first, modify locally, send the complete spec back. Omitting a field deletes it. For one-line CEL or template tweaks, `kubectl apply -f` against an edited YAML is often easier; both paths produce the same end state.
+
+### 4. Change one layer at a time
+
+Platform tasks often span multiple layers:
+
+- Helm install values
+- Control-plane CRDs (Environment, DeploymentPipeline, ComponentType, etc.)
+- Remote-plane resources (data-plane Gateway, ESO ClusterSecretStore, Argo ClusterWorkflowTemplate)
+- App-visible outcomes (available types, workflows, route reachability)
+
+Change the layer that is actually responsible, then re-check the dependent layers. Don't "fix" an application symptom by guessing at platform internals.
+
+### 5. Verify with live evidence
+
+Verification should come from the platform, not assumption:
+
+- Resource conditions changed as expected (`get_*` → `status.conditions[]`).
+- Controller / agent logs show the new state (`kubectl logs` against the relevant plane).
+- Helm release and pod rollout are healthy.
+- The downstream app-facing symptom is gone.
+
+If the platform change succeeded but the app still fails, hand off to or continue with `openchoreo-developer`.

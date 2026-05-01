@@ -2,7 +2,7 @@
 
 This file is the authoring reference for **Workflows** and **ClusterWorkflows** — the platform-engineer-defined templates that power CI builds and standalone automation in OpenChoreo. Backed by [Argo Workflows](https://argo-workflows.readthedocs.io/).
 
-For CEL syntax used in `runTemplate` and `resources`, see `cel.md`. For ComponentType `allowedWorkflows` governance, see also `component-types-and-traits.md`. For the MCP catalog, see `mcp.md`.
+For CEL syntax used in `runTemplate` and `resources`, see [`cel.md`](./cel.md). For ComponentType `allowedWorkflows` governance, see also [`component-types-and-traits.md`](./component-types-and-traits.md). The full MCP tool list is discovered at runtime via the control-plane MCP server.
 
 **Tool surface:**
 
