@@ -3,7 +3,7 @@ name: openchoreo-developer
 description: |
   Use for application-level work on OpenChoreo: deploying and updating Components / Workloads / ReleaseBindings, triggering builds with available CI workflows, connecting components via endpoint dependencies, configuring env vars and secret references, promoting across Environments with per-environment overrides, and inspecting status / events / pod logs for troubleshooting.
 metadata:
-  version: "1.1.0"
+  version: "1.3.0"
 ---
 
 # OpenChoreo Developer Guide

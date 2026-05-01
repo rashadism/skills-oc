@@ -66,7 +66,7 @@ create_component
 
 **Do not call `create_workload`.** Source-build auto-generates `{component}-workload` from the build output (and from `workload.yaml` in the repo, if present).
 
-### 3. (Recommended) Add `workload.yaml` to the repo
+### 3. (Optional) Add `workload.yaml` to the repo
 
 Put a `workload.yaml` at the root of `appPath` to declare endpoints, env vars, config files, and dependencies. Without it, the generated Workload only has `container.image` set — no endpoints, no env, nothing.
 
@@ -150,6 +150,41 @@ What triggers a build:
 If all three match, the platform creates a WorkflowRun automatically with the commit SHA.
 
 > **PE setup required.** Auto-build needs a webhook receiver and webhook secret configured in the platform. If pushes don't trigger builds, escalate to `openchoreo-platform-engineer` to verify the webhook setup.
+
+## When you're in the source repo of the component
+
+If the agent is operating inside the git repo for this component (not just pointing at an external Git URL), the iteration loop becomes tighter — the agent can write `workload.yaml`, coordinate commits/pushes/PRs, and trigger builds against the right commit. **Always coordinate with the user before any git action — confirm before staging, before pushing, before opening a PR.**
+
+### First-time setup: where does the workload spec live?
+
+Two options for source-build, with tradeoffs covered in [`../getting-started.md`](../getting-started.md) §6 — surface the choice to the user, don't pick silently:
+
+- **Committed `workload.yaml`** in the source repo. Spec is source-controlled. Every rebuild does a full `PUT` from the descriptor — endpoints, env, deps, files, image are all regenerated. MCP edits between rebuilds are overwritten.
+- **`update_workload` via MCP** against the auto-generated `{component}-workload`. Spec lives only on the cluster. Fast iteration; **MCP edits persist across rebuilds** because the build only patches `container.image` when no descriptor is in the repo. Adding a `workload.yaml` later is a one-way migration and clobbers any MCP-applied state.
+
+If the user picks committed `workload.yaml`:
+
+1. Compose the descriptor (use [`../../assets/workload-descriptor.yaml`](../../assets/workload-descriptor.yaml) as a starting point). Confirm endpoints, dependencies, env vars, file mounts with the user.
+2. Stage and commit with a clear message ("Add OpenChoreo workload descriptor"). Show the diff before pushing.
+3. Push to the branch the workflow watches (`repository.revision.branch`). If the user works on a PR-only model, push the branch and open a PR via `gh pr create` — surface the PR URL and ask the user to merge before triggering a build, since the build will pull the merged commit.
+4. Trigger the build with `trigger_workflow_run`, or rely on `autoBuild: true` if it's wired up. Use `get_workflow_run_logs` (live) and `get_workflow_run_events` to follow.
+
+If the user picks MCP-edit:
+
+1. Trigger the first build. With no `workload.yaml` in the repo, the platform creates a minimal `{component}-workload` — `container.image` set, everything else empty.
+2. After build success, `update_workload` against `{component}-workload` to add endpoints, dependencies, env vars, file mounts. **Full-spec replacement**: `get_workload` first, modify, write back. These edits persist; subsequent rebuilds will only update the image tag.
+3. Note in `CLAUDE.md` that this component is on the MCP-edit path. Adding a `workload.yaml` to the repo later is a *one-way migration* — the next rebuild will full-PUT from the descriptor and overwrite the live MCP-edited spec. To migrate cleanly: dump current `get_workload` output, transform into descriptor shape, commit, rebuild.
+
+### Iteration loop: code change → rebuild → redeploy
+
+To roll a code change to OpenChoreo:
+
+1. Stage / commit / push the change (with explicit user approval per step). For a PR-based flow, push the branch, open the PR, and wait for the user to merge — surface the PR URL clearly. Don't auto-merge.
+2. After the change is on the watched branch: if `autoBuild: true` is configured and the webhook is healthy, the push triggers a build automatically. Otherwise call `trigger_workflow_run` against the merged commit (pin via the `commit` parameter for reproducibility).
+3. Tail the build with `get_workflow_run_logs`; pair with `get_workflow_run_events` if a task pod is stuck.
+4. On success a new ComponentRelease appears. With `autoDeploy: true`, the first env redeploys automatically; for downstream envs, follow [`./deploy-and-promote.md`](./deploy-and-promote.md).
+
+Persist the iteration command (e.g. "to redeploy: edit code, then ask the agent to push to `main` and trigger the build") in `CLAUDE.md` so the user's next session is one prompt instead of a Q&A loop.
 
 ## Gotchas
 

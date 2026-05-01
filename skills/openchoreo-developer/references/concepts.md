@@ -67,7 +67,14 @@ The build's `generate-workload` step reads `workload.yaml` and emits a Workload 
 
 **Placement**: Must be at the root of the `appPath` directory. If `appPath` is `/backend`, place it at `/backend/workload.yaml`. Not the docker context root, not the repo root (unless `appPath` is `.`).
 
-**Preferred enrichment path**: edit `workload.yaml` in the repo, commit, rebuild. The new workload spec flows through the build. Reach for `update_workload` only when rebuilding isn't possible.
+**Two ways to set / change the workload spec.** The choice is essentially *"is there a `workload.yaml` in the repo or not?"* — the build behaves differently in each case:
+
+- **`workload.yaml` committed to the repo.** Every rebuild fully replaces the cluster Workload from the descriptor (a full `PUT`). All fields — endpoints, env, deps, files, container — are regenerated from `workload.yaml` plus the new image tag. **MCP edits to non-image fields are overwritten on the next rebuild.** Use this when the spec should be source-controlled and reviewable in PRs; treat the descriptor as the single source of truth.
+- **No `workload.yaml`; spec lives only on the cluster.** First build creates a minimal Workload (image only). Subsequent `update_workload` calls via MCP add endpoints, env, deps, files — and **those persist**. On rebuild the build only patches `container.image`; every other field is preserved (`generate-workload.yaml` line ~190). Use this when you want fast iteration on the runtime contract without touching git, or when the spec hasn't stabilized.
+
+A subtlety: **adding `workload.yaml` later is a one-way migration**. The first rebuild that finds it will full-PUT from it, replacing whatever's currently on the cluster (including any MCP-applied endpoints / deps / env). Migrate cleanly: dump current `get_workload` output, build the descriptor from that, commit, then rebuild.
+
+Surface the choice to the user rather than picking silently.
 
 For the descriptor schema and source-build flow, see `./recipes/build-from-source.md`.
 
@@ -200,7 +207,14 @@ dependencies:
 
 This injects `BACKEND_URL` with the resolved address. No hardcoded hostnames, no guessing service DNS names. Note that connections live under `dependencies.endpoints[]`, not directly under `dependencies[]`.
 
-**TCP `address` binding injects `host:port`, not a protocol DSN.** For databases (PostgreSQL, MySQL) and message brokers (NATS, Redis), the injected `address` value is a plain `host:port` string. Apps that expect `postgres://user:pass@host/db` or `nats://host:4222` will fail to parse it. Declare the dependency for the topology diagram but set the full DSN as a literal env var instead. Get the hostname from `get_release_binding` → `endpoints[*].serviceURL.host`.
+**When the injected dependency value doesn't match the format the consumer expects.** The `envBindings` keys (`address`, `host`, `port`, `basePath`) cover the common shapes — but if the consumer expects something else (a connection-string DSN, a compound URL, a custom format stitched from multiple pieces, a non-standard scheme), `envBindings` alone won't get you there.
+
+Two ways to bridge the gap:
+
+- **Per-environment override on the consumer's ReleaseBinding.** Read the dep's live endpoint after it's deployed (`get_release_binding` → `status.endpoints[*].serviceURL.host` and `.port`), compose the value the consumer needs, and set it as a literal in `workloadOverrides.env` per environment. Same `ComponentRelease` promotes across envs cleanly; each binding carries its own value.
+- **Stitch together in the consumer's app code.** Inject `host` and `port` (and any other parts) as separate env vars via `envBindings`; let the app construct the DSN at startup. No platform-side override needed. Requires a small code change in the consumer.
+
+The first two scale across environments and namespaces; the third is fine for one-off / single-env work but worth flagging to the user as a shortcut. Pick based on the situation. Embedded credentials in any of the above should still come from a `SecretReference` via `valueFrom.secretKeyRef`.
 
 ## Discovery-first workflow (per task)
 

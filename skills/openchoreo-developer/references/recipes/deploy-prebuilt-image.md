@@ -103,6 +103,38 @@ create_project
 
 Then change `project_name` on your Component and Workload calls to the new project name.
 
+## When you're in the source repo
+
+If the agent is operating inside the git repo whose code becomes the deployed image, the per-iteration loop depends on **how the image gets built**. Ask the user once and persist the answer in `CLAUDE.md`:
+
+- **External CI** (GitHub Actions, GitLab CI, Jenkins, Buildkite, CircleCI, …) builds and publishes on a trigger.
+- **Manual** — the user runs `docker build` / `docker push` themselves on their workstation, or has an out-of-band script. No CI in the repo.
+- **Hybrid / unsure** — treat as manual until clarified; never assume a CI pipeline you haven't seen.
+
+### External CI
+
+1. **Detect the CI setup** once: check for `.github/workflows/*.yml`, `.gitlab-ci.yml`, `Jenkinsfile`, `.circleci/config.yml`. Skim enough to know what triggers a build (push to a specific branch, `gh workflow run <name>`, manual `workflow_dispatch`) and what registry / image tag the CI publishes to.
+2. **Confirm with the user**: which trigger to use, where the image lands, the tag scheme (commit SHA, semver, `latest`). Persist in `CLAUDE.md`.
+3. **Per iteration**:
+   - Stage / commit / push the code change with explicit user approval per step. For PR-based flows, open the PR via `gh pr create` and wait for the user to merge — don't auto-merge.
+   - Trigger CI per the agreed mechanism (a push to the watched branch usually does it; otherwise `gh workflow run`).
+   - Wait for the new image to land in the registry (`gh run watch`, or ask the user to confirm).
+   - `update_workload` with the new `container.image` tag. Generates a new ComponentRelease; with `autoDeploy: true`, the first env redeploys.
+
+### Manual build & push
+
+The user is the build system. The agent's job is to make the image-tag bump painless once the user has pushed.
+
+1. **Confirm the image reference scheme with the user**: registry, repo, tag style (`v1.2.3`, commit SHA, `latest`). Persist in `CLAUDE.md`.
+2. **Per iteration**:
+   - Code change happens (user edits, or agent edits with approval).
+   - User runs their build/push out of band: typically `docker build -t <registry>/<repo>:<tag> .` then `docker push <registry>/<repo>:<tag>`. The agent can offer the exact command, but **does not run docker push without explicit user approval** — pushes to a registry are visible side-effects.
+   - Once the user confirms the new tag is published, `update_workload` with `container.image: <registry>/<repo>:<new-tag>`. ComponentRelease + redeploy follow as usual.
+
+For the manual flow, **don't push code to the remote** unless the user wants you to — there's no CI listening, so the only purpose of pushing source code is the user's own version control hygiene. Ask before doing it.
+
+In all cases the Component itself doesn't change between iterations — only the Workload's `container.image` reference. Keep the loop tight: one user-approved action per iteration.
+
 ## Gotchas
 
 - **`component_type` is a single string in `{workloadType}/{name}` form**, not a separate kind+name pair. The MCP call constructs the underlying `componentType.kind: ClusterComponentType` reference (built-ins are cluster-scoped).

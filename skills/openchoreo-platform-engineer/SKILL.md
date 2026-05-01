@@ -3,7 +3,7 @@ name: openchoreo-platform-engineer
 description: |
   Use for OpenChoreo platform-level work: authoring ComponentTypes / Traits / Workflows (and cluster-scoped variants), creating Environments and DeploymentPipelines, registering DataPlanes / WorkflowPlanes / ObservabilityPlanes, configuring secret stores, identity, authorization roles, API gateway, alert notification channels, and Helm install / upgrade. The audience is the platform engineer or operator running the OpenChoreo control plane and remote planes — not the application developer deploying onto it.
 metadata:
-  version: "1.1.0"
+  version: "1.3.0"
 ---
 
 # OpenChoreo Platform Engineer Guide
